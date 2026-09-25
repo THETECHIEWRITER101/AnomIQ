@@ -93,7 +93,7 @@ Backend interactive docs available at: `http://localhost:8000/docs`
 
 ---
 
-### 2. Frontend Setup (Machine 1)
+### 2. Frontend Setup
 
 ```bash
 cd frontend
