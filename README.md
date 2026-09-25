@@ -195,4 +195,4 @@ The web dashboard will be available at `http://localhost:5173`.
 
 ## 📄 License
 
-MIT License. Built for Smart India Hackathon.
+MIT License. Built for SIH
