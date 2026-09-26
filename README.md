@@ -33,6 +33,7 @@ Organized as a clean monorepo separating frontend presentation and backend intel
 AnomIQ/
 ├── README.md                      # Platform documentation
 ├── .gitignore                     # Git exclusion rules
+├── tsconfig.json                  # Root TypeScript project reference configuration
 │
 ├── frontend/                      # React 19 + Vite Single Page Application
 │   ├── vercel.json                # Vercel deployment & SPA rewrites
