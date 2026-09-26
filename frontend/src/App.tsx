@@ -40,7 +40,7 @@ export default function App() {
         {/* Footer */}
         <footer className="border-t border-zinc-900 bg-zinc-950 py-6 text-center text-xs text-zinc-600">
           <p>
-            AnomIQ &bull; Smart India Hackathon 2026 &bull; Distributed Manufacturing AI Platform
+            AnomIQ &bull; Sistec Innovation Hackathon (SIH) 2026 &bull; Distributed Manufacturing AI Platform
           </p>
         </footer>
       </div>

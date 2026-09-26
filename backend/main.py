@@ -14,7 +14,7 @@ except Exception as e:
 
 app = FastAPI(
     title="AnomIQ - Industrial Anomaly Platform API",
-    description="Smart India Hackathon 2026 Anomaly Detection and AI CAPA Management API",
+    description="Sistec Innovation Hackathon (SIH) 2026 Anomaly Detection and AI CAPA Management API",
     version="1.0.0"
 )
 
@@ -40,7 +40,7 @@ app.include_router(ai_routes.router)
 @app.get("/")
 def root():
     return {
-        "platform": "AnomIQ SIH Anomaly Platform",
+        "platform": "AnomIQ Sistec Innovation Hackathon (SIH) Anomaly Platform",
         "status": "online",
         "version": "1.0.0",
         "docs_url": "/docs"
