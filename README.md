@@ -188,5 +188,5 @@ AnomIQ/
 
 ## 📄 License
 
-Distributed under the **MIT License**. Built for Smart India Hackathon (SIH) Manufacturing Intelligence Challenge.
+Distributed under the **MIT License**. Built for (SIH) Manufacturing Intelligence Challenge.
 
