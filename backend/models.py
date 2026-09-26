@@ -30,6 +30,7 @@ class CapaAction(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     anomaly_id = Column(Integer, ForeignKey("anomalies.id", ondelete="CASCADE"), nullable=False, index=True)
     root_cause = Column(Text, nullable=False)
+    containment_action = Column(Text, nullable=True)
     corrective_action = Column(Text, nullable=False)
     preventive_action = Column(Text, nullable=False)
     ai_confidence = Column(Float, default=90.0)

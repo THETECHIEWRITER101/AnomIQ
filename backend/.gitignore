@@ -1,0 +1,17 @@
+# Environment variables & API credentials
+.env
+.env.*
+*.env
+!.env.example
+!*.env.example
+
+# Python virtual environment
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local database files
+*.db
+*.sqlite
+*.sqlite3

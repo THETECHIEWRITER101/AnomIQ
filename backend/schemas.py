@@ -26,6 +26,7 @@ class CapaResponse(BaseModel):
     id: int
     anomaly_id: int
     root_cause: str
+    containment_action: Optional[str] = None
     corrective_action: str
     preventive_action: str
     ai_confidence: float
