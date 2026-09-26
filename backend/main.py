@@ -18,17 +18,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS configuration for Frontend Machine (Lenovo LOQ / Vite :5173) and local development
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "*"
-]
+import os
+
+# Parse origins from env, defaulting to local development URLs
+raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000")
+origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Permits every Vercel preview/production branch
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
