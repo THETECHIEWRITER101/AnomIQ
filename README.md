@@ -168,7 +168,8 @@ AnomIQ/
 | `GET` | `/api/anomalies/{id}` | Get detailed record for a specific anomaly and linked CAPA |
 | `PATCH` | `/api/anomalies/{id}/status` | Update anomaly status (`OPEN`, `INVESTIGATING`, `RESOLVED`, `CLOSED`) |
 | `DELETE`| `/api/anomalies/{id}` | Delete an anomaly record |
-| `POST` | `/api/ai/generate-capa/{anomaly_id}` | Synthesize AI 8D Root Cause Analysis & CAPA recommendations |
+| `POST` | `/api/ai/capa/generate/{anomaly_id}` | Synthesize AI 8D Root Cause Analysis & CAPA recommendations (HTTP 201) |
+| `POST` | `/api/ai/generate-capa/{anomaly_id}` | Legacy compatible route for CAPA generation |
 | `GET` | `/api/ai/capa-reviews` | Fetch pending/reviewed CAPA action items |
 | `PATCH` | `/api/ai/capa/{capa_id}/review` | Review & approve/reject CAPA (`APPROVED`, `REJECTED`, `IMPLEMENTED`) |
 | `GET` | `/api/analytics/dashboard` | Retrieve high-level KPI card metrics and active alerts |
@@ -180,7 +181,7 @@ AnomIQ/
 
 ### Deployment Overview
 - **Database (Supabase)**: Paste your Supabase PostgreSQL URI into `DATABASE_URL` on Render/Local `.env`.
-- **Backend (Render)**: Deploy `backend/` directory as a Web Service. Set start command to `uvicorn main:app --host 0.0.0.0 --port $PORT`.
+- **Backend (Render)**: Deploy `backend/` directory as a Web Service. Set start command to `uvicorn main:app --host 0.0.0.0 --port $PORT`. The backend includes dynamic `CORS_ORIGINS` support and wildcard regex matching (`https://.*\.vercel\.app`) for all Vercel preview and production deployments.
 - **Frontend (Vercel)**: Deploy `frontend/` directory to Vercel. Set `VITE_API_URL` to your live Render API URL.
 
 ---
