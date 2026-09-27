@@ -16,6 +16,7 @@ def get_anomalies(
     severity: Optional[str] = Query(None),
     status_filter: Optional[str] = Query(None, alias="status"),
     line: Optional[str] = Query(None),
+    critical_breach_only: Optional[bool] = Query(False),
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Anomaly)
@@ -25,6 +26,12 @@ def get_anomalies(
         query = query.filter(models.Anomaly.status == status_filter)
     if line and line != "ALL":
         query = query.filter(models.Anomaly.production_line.contains(line))
+    if critical_breach_only:
+        query = query.filter(
+            models.Anomaly.metric_value.isnot(None),
+            models.Anomaly.threshold_value.isnot(None),
+            models.Anomaly.metric_value > models.Anomaly.threshold_value
+        )
     
     return query.order_by(desc(models.Anomaly.detected_at)).all()
 
