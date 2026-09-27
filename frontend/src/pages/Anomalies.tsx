@@ -7,12 +7,14 @@ import {
   ChevronRight,
   HelpCircle,
   FileDown,
-  AlertCircle
+  AlertCircle,
+  FileSpreadsheet
 } from 'lucide-react';
 import { anomalyApi, Anomaly } from '../services/api';
 import CreateAnomalyModal from '../components/CreateAnomalyModal';
 import FiveWhysCopilotModal from '../components/FiveWhysCopilotModal';
 import { exportCapaAuditPdf } from '../utils/exportAuditPdf';
+import { exportAnomaliesToCsv } from '../utils/exportCsv';
 
 export const Anomalies: React.FC = () => {
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
@@ -208,7 +210,16 @@ export const Anomalies: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={() => exportAnomaliesToCsv(filteredAnomalies)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-xl text-zinc-300 text-xs font-semibold transition"
+            title="Export filtered anomalies to CSV"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Export CSV</span>
+          </button>
           <button
             onClick={fetchAnomalies}
             className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-300 text-xs hover:bg-zinc-800 transition"
