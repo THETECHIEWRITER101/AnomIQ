@@ -22,13 +22,16 @@ export interface Anomaly {
   threshold_value?: number;
   detected_at: string;
   operator_name?: string;
+  image_url?: string;
   capa?: CapaAction;
+  capas?: CapaAction[];
 }
 
 export interface CapaAction {
   id: number;
   anomaly_id: number;
   root_cause: string;
+  containment_action?: string;
   corrective_action: string;
   preventive_action: string;
   ai_confidence: number;
@@ -56,12 +59,74 @@ export interface CreateAnomalyPayload {
   metric_value?: number;
   threshold_value?: number;
   operator_name?: string;
+  image_url?: string;
+}
+
+export interface DuplicateMatch {
+  id: number;
+  title: string;
+  machine_id: string;
+  production_line: string;
+  detected_at: string;
+  similarity_score: number;
+  status: string;
+}
+
+export interface DuplicateCheckResponse {
+  is_duplicate_suspected: boolean;
+  threshold: number;
+  matches: DuplicateMatch[];
+}
+
+export interface VoiceIntakeResponse {
+  title: string;
+  machine_id: string;
+  production_line: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  description: string;
+  metric_name?: string;
+  metric_value?: number;
+  threshold_value?: number;
+}
+
+export interface FiveWhysHistoryItem {
+  step: number;
+  question: string;
+  answer: string;
+}
+
+export interface FiveWhysStepPayload {
+  anomaly_id?: number;
+  anomaly_title?: string;
+  machine_id?: string;
+  production_line?: string;
+  metric_name?: string;
+  metric_value?: number;
+  threshold_value?: number;
+  step: number;
+  history: FiveWhysHistoryItem[];
+  technician_input?: string;
+}
+
+export interface FiveWhysStepResponse {
+  current_step: number;
+  why_question: string;
+  quick_options: string[];
+  is_final_step: boolean;
+  synthesized_root_cause?: string;
+  suggested_corrective_action?: string;
+  suggested_preventive_action?: string;
 }
 
 export const anomalyApi = {
   // Anomaly CRUD
   getAnomalies: async (params?: { severity?: string; status?: string; line?: string }) => {
     const res = await apiClient.get<Anomaly[]>('/api/anomalies', { params });
+    return res.data;
+  },
+
+  getActiveAnomalies: async () => {
+    const res = await apiClient.get<Anomaly[]>('/api/anomalies/active');
     return res.data;
   },
 
@@ -72,6 +137,14 @@ export const anomalyApi = {
 
   createAnomaly: async (payload: CreateAnomalyPayload) => {
     const res = await apiClient.post<Anomaly>('/api/anomalies', payload);
+    return res.data;
+  },
+
+  checkDuplicates: async (title: string, timeWindowHours: number = 24) => {
+    const res = await apiClient.post<DuplicateCheckResponse>('/api/anomalies/check-duplicates', {
+      title,
+      time_window_hours: timeWindowHours,
+    });
     return res.data;
   },
 
@@ -98,7 +171,7 @@ export const anomalyApi = {
 
   // AI & CAPA
   generateCapa: async (anomalyId: number) => {
-    const res = await apiClient.post<CapaAction>(`/api/ai/generate-capa/${anomalyId}`);
+    const res = await apiClient.post<CapaAction>(`/api/ai/capa/generate/${anomalyId}`);
     return res.data;
   },
 
@@ -112,6 +185,18 @@ export const anomalyApi = {
       review_status,
       reviewer_notes,
     });
+    return res.data;
+  },
+
+  // Voice to Defect Intake (Floor Mode)
+  parseVoiceIntake: async (transcript: string) => {
+    const res = await apiClient.post<VoiceIntakeResponse>('/api/ai/voice-intake', { transcript });
+    return res.data;
+  },
+
+  // Interactive 5-Whys Diagnostic Copilot
+  process5WhysStep: async (payload: FiveWhysStepPayload) => {
+    const res = await apiClient.post<FiveWhysStepResponse>('/api/ai/5-whys/step', payload);
     return res.data;
   },
 };

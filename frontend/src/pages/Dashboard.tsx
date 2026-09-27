@@ -8,10 +8,12 @@ import {
   ArrowUpRight,
   ShieldAlert,
   Zap,
-  RefreshCw
+  RefreshCw,
+  HelpCircle
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { anomalyApi, Anomaly, DashboardMetrics } from '../services/api';
+import FiveWhysCopilotModal from '../components/FiveWhysCopilotModal';
 
 interface DashboardProps {
   onOpenCreateModal?: () => void;
@@ -23,6 +25,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
   const [loading, setLoading] = useState(true);
   const [generatingId, setGeneratingId] = useState<number | null>(null);
   const [aiMessage, setAiMessage] = useState<string | null>(null);
+  const [copilotAnomaly, setCopilotAnomaly] = useState<Anomaly | null>(null);
 
   const fetchDashboardData = async () => {
     try {
@@ -295,14 +298,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
                   )}
                 </div>
 
-                <div className="flex items-center gap-3 self-end lg:self-center">
+                <div className="flex items-center gap-2 self-end lg:self-center">
+                  <button
+                    type="button"
+                    onClick={() => setCopilotAnomaly(issue)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition active:scale-95"
+                    title="Launch 5-Whys Diagnostic Assistant"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5 text-orange-400" />
+                    <span>5-Whys</span>
+                  </button>
+
                   <button
                     disabled={generatingId === issue.id}
                     onClick={() => handleQuickCapa(issue.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-semibold transition"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-semibold transition disabled:opacity-50"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>{generatingId === issue.id ? 'Generating...' : 'AI CAPA'}</span>
+                    <Sparkles className={`w-3.5 h-3.5 ${generatingId === issue.id ? 'animate-spin' : ''}`} />
+                    <span>{generatingId === issue.id ? 'Analyzing...' : 'AI CAPA'}</span>
                   </button>
 
                   <NavLink
@@ -317,6 +330,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
           )}
         </div>
       </div>
+
+      {/* 5-Whys Diagnostic Copilot Modal */}
+      <FiveWhysCopilotModal
+        isOpen={!!copilotAnomaly}
+        onClose={() => setCopilotAnomaly(null)}
+        anomaly={copilotAnomaly}
+        onSuccess={fetchDashboardData}
+      />
     </div>
   );
 };

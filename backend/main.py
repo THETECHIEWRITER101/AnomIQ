@@ -9,6 +9,12 @@ from routers import crud_routes, ai_routes
 # Initialize database schema tables
 try:
     models.Base.metadata.create_all(bind=database.engine)
+    with database.engine.begin() as conn:
+        try:
+            from sqlalchemy import text
+            conn.execute(text("ALTER TABLE anomalies ADD COLUMN image_url VARCHAR(500)"))
+        except Exception:
+            pass
 except Exception as e:
     print(f"Notice: Database schema creation encountered: {e}")
 
@@ -44,6 +50,14 @@ def root():
         "status": "online",
         "version": "1.0.0",
         "docs_url": "/docs"
+    }
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "uptime": "active",
+        "service": "anomiq-backend"
     }
 
 if __name__ == "__main__":

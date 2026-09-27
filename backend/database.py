@@ -18,7 +18,13 @@ def init_engine():
     target_url = DATABASE_URL
     if "sqlite" not in target_url:
         try:
-            test_engine = create_engine(target_url, pool_pre_ping=True, pool_recycle=300)
+            test_engine = create_engine(
+                target_url,
+                pool_size=5,
+                max_overflow=0,
+                pool_recycle=300,
+                pool_pre_ping=True
+            )
             with test_engine.connect() as conn:
                 pass
             return test_engine

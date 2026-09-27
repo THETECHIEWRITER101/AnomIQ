@@ -1,5 +1,3 @@
-import os
-import json
 import datetime
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,7 +16,7 @@ def run_capa_generation(anomaly_id: int, db: Session):
     if not anomaly:
         raise HTTPException(status_code=404, detail="Anomaly record not found")
 
-    # Query Gemini reasoning engine via ai_service
+    # Query Gemini reasoning engine via ai_service with token limit & caching
     capa_data = ai_engine.generate_capa(
         title=anomaly.title,
         description=anomaly.description,
@@ -59,24 +57,18 @@ def run_capa_generation(anomaly_id: int, db: Session):
 @router.post("/capa/generate/{anomaly_id}", response_model=schemas.CapaResponse, status_code=status.HTTP_201_CREATED)
 def generate_capa_for_anomaly(anomaly_id: int, db: Session = Depends(get_db)):
     """
-    Step 4: Expose the CAPA Generation REST Endpoint.
-    Queries the reported defect, passes details to Gemini 3.8 Flash,
-    persists structured CAPA into database, and advances status to CAPA_PENDING.
+    Expose CAPA Generation REST Endpoint.
+    Passes sanitized defect details to Gemini 3.8 Flash, persists structured CAPA, and advances status to CAPA_PENDING.
     """
     return run_capa_generation(anomaly_id, db)
 
 @router.post("/generate-capa/{anomaly_id}", response_model=schemas.CapaResponse)
 def generate_capa_legacy(anomaly_id: int, db: Session = Depends(get_db)):
-    """
-    Frontend-compatible endpoint route forwarding to CAPA generation engine.
-    """
     return run_capa_generation(anomaly_id, db)
-
 
 @router.get("/capa-reviews", response_model=List[schemas.CapaResponse])
 def get_capa_reviews(db: Session = Depends(get_db)):
     return db.query(models.CapaAction).order_by(desc(models.CapaAction.generated_at)).all()
-
 
 @router.patch("/capa/{capa_id}/review", response_model=schemas.CapaResponse)
 def update_capa_review(capa_id: int, payload: schemas.CapaReviewUpdate, db: Session = Depends(get_db)):
@@ -99,3 +91,68 @@ def update_capa_review(capa_id: int, payload: schemas.CapaReviewUpdate, db: Sess
     db.commit()
     db.refresh(capa)
     return capa
+
+
+@router.post("/voice-intake", response_model=schemas.VoiceIntakeResponse)
+def parse_voice_intake(payload: schemas.VoiceIntakeRequest):
+    """
+    Zero-Cost Voice-to-Defect Intake (Floor Mode).
+    Transcribes operator speech directly on the frontend using Web Speech API,
+    then parses with Gemini Flash into structured ticket attributes.
+    """
+    parsed = ai_engine.parse_voice_intake(payload.transcript)
+    return schemas.VoiceIntakeResponse(
+        title=parsed.get("component", "Anomaly") + ": " + parsed.get("symptom", "Reported Defect")[:60],
+        machine_id=parsed.get("component", "MACHINE-01"),
+        production_line=parsed.get("line", "Line A - Precision Machining"),
+        severity=parsed.get("suggested_severity", "HIGH"),
+        description=parsed.get("symptom", payload.transcript),
+        metric_name=parsed.get("metric_name", "Deviation"),
+        metric_value=parsed.get("metric_value", 1.0),
+        threshold_value=0.5
+    )
+
+
+@router.post("/5-whys/step", response_model=schemas.FiveWhysStepResponse)
+def process_5_whys_step(payload: schemas.FiveWhysStepRequest, db: Session = Depends(get_db)):
+    """
+    Interactive '5-Whys' Diagnostic Copilot.
+    Prompts technician step-by-step through the 5-Whys root-cause tree with telemetry-aware quick-response chips.
+    """
+    anomaly_info = {
+        "title": payload.anomaly_title or "Machine Deviation",
+        "machine_id": payload.machine_id or "Equipment",
+        "production_line": payload.production_line or "Plant Floor",
+        "metric_name": payload.metric_name,
+        "metric_value": payload.metric_value,
+        "threshold_value": payload.threshold_value,
+    }
+
+    if payload.anomaly_id:
+        anomaly = db.query(models.Anomaly).filter(models.Anomaly.id == payload.anomaly_id).first()
+        if anomaly:
+            anomaly_info["title"] = anomaly.title
+            anomaly_info["machine_id"] = anomaly.machine_id
+            anomaly_info["production_line"] = anomaly.production_line
+            anomaly_info["metric_name"] = anomaly.metric_name
+            anomaly_info["metric_value"] = anomaly.metric_value
+            anomaly_info["threshold_value"] = anomaly.threshold_value
+
+    history_dicts = [{"step": h.step, "question": h.question, "answer": h.answer} for h in payload.history]
+
+    result = ai_engine.generate_5_whys_step(
+        anomaly_info=anomaly_info,
+        step=payload.step,
+        history=history_dicts,
+        technician_input=payload.technician_input
+    )
+
+    return schemas.FiveWhysStepResponse(
+        current_step=result.get("current_step", payload.step),
+        why_question=result.get("why_question", f"Why did this occur at Step {payload.step}?"),
+        quick_options=result.get("quick_options", []),
+        is_final_step=result.get("is_final_step", False),
+        synthesized_root_cause=result.get("synthesized_root_cause", ""),
+        suggested_corrective_action=result.get("suggested_corrective_action", ""),
+        suggested_preventive_action=result.get("suggested_preventive_action", "")
+    )

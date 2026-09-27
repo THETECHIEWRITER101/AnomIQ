@@ -7,9 +7,11 @@ import {
   AlertCircle, 
   MessageSquare,
   FileCheck2,
-  RefreshCw
+  RefreshCw,
+  FileDown
 } from 'lucide-react';
 import { anomalyApi, CapaAction } from '../services/api';
+import { exportCapaAuditPdf } from '../utils/exportAuditPdf';
 
 export const CapaReview: React.FC = () => {
   const [capas, setCapas] = useState<CapaAction[]>([]);
@@ -17,6 +19,12 @@ export const CapaReview: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [notesState, setNotesState] = useState<{ [id: number]: string }>({});
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const fetchCapas = async () => {
     try {
@@ -25,13 +33,13 @@ export const CapaReview: React.FC = () => {
       setCapas(data);
     } catch (err) {
       console.warn('Backend unavailable, using initial demo CAPA actions', err);
-      // Fallback demo CAPA actions
       setCapas([
         {
           id: 1,
           anomaly_id: 1,
           root_cause: "Fatigue spalling on the inner race of the drive-end angular contact spindle bearing due to lubricant starvation during high-speed cycle runs.",
-          corrective_action: "Immediately halt Line A milling sequence. Flush lubrication reservoir, inspect spindle runout, and replace dual-row bearing assembly with OEM SKF 7014-CD/P4A.",
+          containment_action: "Halt Line A milling sequence. Tag in-process components and isolate machine spindle.",
+          corrective_action: "Flush lubrication reservoir, inspect spindle runout, and replace dual-row bearing assembly with OEM SKF 7014-CD/P4A.",
           preventive_action: "Upgrade automated oil-air mister nozzle frequency from 15-min intervals to continuous micro-metering. Integrate vibration edge-sensor trip threshold at 6.0 mm/s.",
           ai_confidence: 94.8,
           review_status: "PENDING_REVIEW",
@@ -42,7 +50,8 @@ export const CapaReview: React.FC = () => {
           id: 2,
           anomaly_id: 2,
           root_cause: "High-pressure polyurethane seal extrusion in the main cylinder port block caused by thermal oil degradation and particulate contamination.",
-          corrective_action: "Depressurize hydraulic circuit. Replace manifold o-rings and cylinder seals with Viton 90 durometer high-temp rings. Filter hydraulic reservoir to ISO 4406 16/14/11 standard.",
+          containment_action: "Depressurize hydraulic circuit and tag out pump station pending inspection.",
+          corrective_action: "Replace manifold o-rings and cylinder seals with Viton 90 durometer high-temp rings. Filter hydraulic reservoir to ISO 4406 16/14/11 standard.",
           preventive_action: "Install in-line kidney-loop filtration unit with beta-200 water absorption element. Schedule bi-weekly oil dielectric and particulate spectroscopic sampling.",
           ai_confidence: 91.2,
           review_status: "APPROVED",
@@ -53,6 +62,7 @@ export const CapaReview: React.FC = () => {
           id: 3,
           anomaly_id: 3,
           root_cause: "Internal coolant channel blockage in copper alloy electrode arm tip causing localized thermal dissipation collapse during repetitive spot resistance welds.",
+          containment_action: "Quarantine welded batch lots 402 through 415 for non-destructive ultrasonic peel tests.",
           corrective_action: "Acid flush cooling conduits with scale remover. Replace calcified electrode holder tip and verify chiller flow rate reaches > 4.5 L/min.",
           preventive_action: "Add vortex flow meter with digital interlock to Robot #2 PLC. Stop automatic cycle if coolant flow drops below 3.8 L/min.",
           ai_confidence: 88.5,
@@ -70,26 +80,34 @@ export const CapaReview: React.FC = () => {
     fetchCapas();
   }, []);
 
+  // Optimistic UI updates with rollback on failure
   const handleReviewAction = async (capaId: number, newStatus: string) => {
+    if (actionLoadingId === capaId) return;
+    const previousCapas = [...capas];
+    const note = notesState[capaId] || '';
+
+    // Instant visual update
+    setCapas((prev) =>
+      prev.map((c) =>
+        c.id === capaId
+          ? {
+              ...c,
+              review_status: newStatus as any,
+              reviewer_notes: note || c.reviewer_notes,
+              reviewed_at: new Date().toISOString(),
+            }
+          : c
+      )
+    );
+
     try {
       setActionLoadingId(capaId);
-      const note = notesState[capaId] || '';
       await anomalyApi.updateCapaStatus(capaId, newStatus, note);
-      await fetchCapas();
+      showToast(`CAPA #${capaId} marked as ${newStatus}.`);
     } catch (err: any) {
-      // Optimistic update
-      setCapas((prev) =>
-        prev.map((c) =>
-          c.id === capaId
-            ? {
-                ...c,
-                review_status: newStatus as any,
-                reviewer_notes: notesState[capaId] || c.reviewer_notes,
-                reviewed_at: new Date().toISOString()
-              }
-            : c
-        )
-      );
+      // Revert on failure
+      setCapas(previousCapas);
+      showToast('Network error: Could not update CAPA status. Reverting change.');
     } finally {
       setActionLoadingId(null);
     }
@@ -102,6 +120,14 @@ export const CapaReview: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-4 right-4 z-50 p-3.5 rounded-xl bg-orange-500 text-zinc-950 font-bold text-xs shadow-2xl animate-fade-in flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -114,7 +140,7 @@ export const CapaReview: React.FC = () => {
             </span>
           </div>
           <p className="text-zinc-400 text-sm mt-1">
-            Validate automated root cause determinations and approve corrective/preventive protocols
+            Validate 8D root-cause determinations, approve engineering protocols, and export client-side ISO 9001 / OSHA audit reports
           </p>
         </div>
 
@@ -172,11 +198,22 @@ export const CapaReview: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  {/* Client-Side ISO 9001 / OSHA PDF Export Button */}
+                  <button
+                    type="button"
+                    onClick={() => exportCapaAuditPdf(capa)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition active:scale-95 shadow-sm"
+                    title="Generate client-side ISO 9001 & OSHA 1910 formal audit report PDF"
+                  >
+                    <FileDown className="w-3.5 h-3.5" />
+                    <span>ISO 9001 Export</span>
+                  </button>
+
                   {/* Confidence Badge */}
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
                     <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>AI Confidence: {capa.ai_confidence}%</span>
+                    <span>Confidence: {capa.ai_confidence}%</span>
                   </div>
 
                   {/* Status Badge */}
@@ -261,7 +298,7 @@ export const CapaReview: React.FC = () => {
                     className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs transition shadow-md shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Approve
+                    <span>Approve</span>
                   </button>
 
                   <button
@@ -270,7 +307,7 @@ export const CapaReview: React.FC = () => {
                     className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition active:scale-95 disabled:opacity-50"
                   >
                     <FileCheck2 className="w-3.5 h-3.5" />
-                    Implemented
+                    <span>Implemented</span>
                   </button>
 
                   <button
@@ -279,7 +316,7 @@ export const CapaReview: React.FC = () => {
                     className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold text-xs transition active:scale-95 disabled:opacity-50"
                   >
                     <XCircle className="w-3.5 h-3.5" />
-                    Reject
+                    <span>Reject</span>
                   </button>
                 </div>
               </div>

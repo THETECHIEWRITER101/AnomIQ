@@ -13,6 +13,7 @@ class AnomalyBase(BaseModel):
     metric_value: Optional[float] = None
     threshold_value: Optional[float] = None
     operator_name: Optional[str] = None
+    image_url: Optional[str] = None
 
 class AnomalyCreate(AnomalyBase):
     pass
@@ -56,3 +57,63 @@ class DashboardMetricsResponse(BaseModel):
     pending_capa: int
     mttr_hours: float
     recent_anomalies: List[AnomalyResponse]
+
+# Duplicate & Recurrence Clustering Schemas
+class DuplicateCheckRequest(BaseModel):
+    title: str
+    time_window_hours: Optional[int] = 24
+
+class DuplicateMatch(BaseModel):
+    id: int
+    title: str
+    machine_id: str
+    production_line: str
+    detected_at: datetime
+    similarity_score: float
+    status: str
+
+class DuplicateCheckResponse(BaseModel):
+    is_duplicate_suspected: bool
+    threshold: float = 0.4
+    matches: List[DuplicateMatch]
+
+# Voice Intake Schemas
+class VoiceIntakeRequest(BaseModel):
+    transcript: str
+
+class VoiceIntakeResponse(BaseModel):
+    title: str
+    machine_id: str
+    production_line: str
+    severity: str
+    description: str
+    metric_name: Optional[str] = "Deviation"
+    metric_value: Optional[float] = None
+    threshold_value: Optional[float] = None
+
+# 5-Whys Diagnostic Copilot Schemas
+class FiveWhysHistoryItem(BaseModel):
+    step: int
+    question: str
+    answer: str
+
+class FiveWhysStepRequest(BaseModel):
+    anomaly_id: Optional[int] = None
+    anomaly_title: Optional[str] = None
+    machine_id: Optional[str] = None
+    production_line: Optional[str] = None
+    metric_name: Optional[str] = None
+    metric_value: Optional[float] = None
+    threshold_value: Optional[float] = None
+    step: int
+    history: List[FiveWhysHistoryItem] = []
+    technician_input: Optional[str] = None
+
+class FiveWhysStepResponse(BaseModel):
+    current_step: int
+    why_question: str
+    quick_options: List[str]
+    is_final_step: bool
+    synthesized_root_cause: Optional[str] = ""
+    suggested_corrective_action: Optional[str] = ""
+    suggested_preventive_action: Optional[str] = ""
