@@ -308,6 +308,7 @@ def seed_database():
                 metric_value=row["metric_value"],
                 threshold_value=row["threshold_value"],
                 operator_name=row["operator_name"],
+                image_url=f"https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800&auto=format&fit=crop&q=75" if row["severity"] in ["CRITICAL", "HIGH"] else None,
                 detected_at=detected_time,
                 resolved_at=now - datetime.timedelta(hours=row["hours_ago"]/2) if row["status"] == "RESOLVED" else None
             )
@@ -323,9 +324,10 @@ def seed_database():
                 capa = models.CapaAction(
                     anomaly_id=anom.id,
                     root_cause=f"Primary mechanical degradation in {anom.machine_id}: Excessive fatigue wear on key moving assemblies causing {anom.metric_name} deviation.",
+                    containment_action=f"Quarantine in-process workpieces on {anom.production_line} and tag machine circuit with Lockout/Tagout.",
                     corrective_action=f"Lockout/Tagout {anom.machine_id}. Replace worn subcomponents, flush lubrication fluid, and recalibrate precision sensors to OEM factory tolerances.",
                     preventive_action=f"Implement high-resolution edge vibration and temperature monitoring with automated early-warning telemetry trips before threshold violation.",
-                    ai_confidence=random.uniform(91.5, 96.5),
+                    ai_confidence=round(random.uniform(91.5, 96.5), 1),
                     review_status="PENDING_REVIEW" if anom.id != 1 else "APPROVED",
                     reviewer_notes="Reviewed by Senior Quality Lead. Action item cleared for upcoming scheduled downtime window." if anom.id == 1 else None,
                     generated_at=anom.detected_at + datetime.timedelta(minutes=15)
