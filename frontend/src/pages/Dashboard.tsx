@@ -12,7 +12,8 @@ import {
   ShieldAlert, 
   CheckCircle2, 
   HelpCircle,
-  FileDown
+  FileDown,
+  Plus
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { anomalyApi, Anomaly, DashboardMetrics } from '../services/api';
@@ -56,9 +57,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await anomalyApi.getDashboardMetrics();
       setMetrics(res);
       setRecentIssues(res.recent_anomalies || []);
@@ -66,7 +67,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
         const top = res.recent_anomalies[0];
         setFeaturedAnomaly((prev) => ({
           ...prev,
-          id: top.id ? `00000000-0000-0000-0000-${String(top.id).padStart(12, '0')}` : prev.id,
+          id: top.id ? String(top.id) : prev.id,
           title: top.title || prev.title,
           machine_line: `${top.machine_id} - ${top.production_line}`,
           severity: top.severity || prev.severity,
@@ -78,79 +79,129 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
         }));
       }
     } catch (err) {
-      console.warn('Backend not responding or empty, using sample dashboard state', err);
-      setMetrics({
-        total_anomalies: 28,
-        active_critical: 4,
-        pending_capa: 6,
-        mttr_hours: 3.2,
-        recent_anomalies: []
-      });
-      setRecentIssues([
-        {
-          id: 101,
-          title: "Solder bridging on BGA power rail",
-          machine_id: "SMT-LINE-01",
-          production_line: "SMT Surface Mount Line 1",
-          severity: "CRITICAL",
-          status: "CAPA_PENDING",
-          description: "Micro-bridging detected across 0.4mm pitch solder spheres during post-reflow inspection.",
-          metric_name: "Reflow Peak Temp",
-          metric_value: 268.4,
-          threshold_value: 245.0,
-          detected_at: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-          operator_name: "Dev Patel"
-        },
-        {
-          id: 102,
-          title: "Hydraulic pressure loss on Press #3",
-          machine_id: "PRESS-HYD-03",
-          production_line: "Line B - Hydraulic Press & Stamping",
-          severity: "CRITICAL",
-          status: "OPEN",
-          description: "Operating pressure dropped from 210 bar to 135 bar during continuous cycle.",
-          metric_name: "Pressure (Bar)",
-          metric_value: 135,
-          threshold_value: 200,
-          detected_at: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
-          operator_name: "Sunil K."
-        },
-        {
-          id: 103,
-          title: "Thermal runout in weld arm #2",
-          machine_id: "WELD-ROBOT-02",
-          production_line: "Line C - Robotic Welding",
-          severity: "HIGH",
-          status: "CAPA_PENDING",
-          description: "Tip temperature exceeded 850°C during spot welding of chassis joint.",
-          metric_name: "Tip Temp (°C)",
-          metric_value: 865,
-          threshold_value: 780,
-          detected_at: new Date(Date.now() - 1000 * 60 * 85).toISOString(),
-          operator_name: "Anita R."
-        },
-        {
-          id: 104,
-          title: "Spindle bearing harmonic vibration",
-          machine_id: "CNC-MILL-01",
-          production_line: "Line A - Precision Machining",
-          severity: "MEDIUM",
-          status: "INVESTIGATING",
-          description: "Sub-harmonic acoustic resonance detected at 3200 RPM shaft speed.",
-          metric_name: "Vibration (mm/s)",
-          metric_value: 5.8,
-          threshold_value: 4.0,
-          detected_at: new Date(Date.now() - 1000 * 60 * 130).toISOString(),
-          operator_name: "Dev Patel"
-        }
-      ]);
+      if (!silent) {
+        console.warn('Backend not responding or empty, using sample dashboard state', err);
+        setMetrics({
+          total_anomalies: 28,
+          active_critical: 4,
+          pending_capa: 6,
+          mttr_hours: 3.2,
+          recent_anomalies: []
+        });
+        setRecentIssues([
+          {
+            id: 101,
+            title: "Solder bridging on BGA power rail",
+            machine_id: "SMT-LINE-01",
+            production_line: "SMT Surface Mount Line 1",
+            severity: "CRITICAL",
+            status: "CAPA_PENDING",
+            description: "Micro-bridging detected across 0.4mm pitch solder spheres during post-reflow inspection.",
+            metric_name: "Reflow Peak Temp",
+            metric_value: 268.4,
+            threshold_value: 245.0,
+            detected_at: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
+            operator_name: "Dev Patel"
+          },
+          {
+            id: 102,
+            title: "Hydraulic pressure loss on Press #3",
+            machine_id: "PRESS-HYD-03",
+            production_line: "Line B - Hydraulic Press & Stamping",
+            severity: "CRITICAL",
+            status: "OPEN",
+            description: "Operating pressure dropped from 210 bar to 135 bar during continuous cycle.",
+            metric_name: "Pressure (Bar)",
+            metric_value: 135,
+            threshold_value: 200,
+            detected_at: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
+            operator_name: "Sunil K."
+          },
+          {
+            id: 103,
+            title: "Thermal runout in weld arm #2",
+            machine_id: "WELD-ROBOT-02",
+            production_line: "Line C - Robotic Welding",
+            severity: "HIGH",
+            status: "CAPA_PENDING",
+            description: "Tip temperature exceeded 850°C during spot welding of chassis joint.",
+            metric_name: "Tip Temp (°C)",
+            metric_value: 865,
+            threshold_value: 780,
+            detected_at: new Date(Date.now() - 1000 * 60 * 85).toISOString(),
+            operator_name: "Anita R."
+          },
+          {
+            id: 104,
+            title: "Spindle bearing harmonic vibration",
+            machine_id: "CNC-MILL-01",
+            production_line: "Line A - Precision Machining",
+            severity: "MEDIUM",
+            status: "INVESTIGATING",
+            description: "Sub-harmonic acoustic resonance detected at 3200 RPM shaft speed.",
+            metric_name: "Vibration (mm/s)",
+            metric_value: 5.8,
+            threshold_value: 4.0,
+            detected_at: new Date(Date.now() - 1000 * 60 * 130).toISOString(),
+            operator_name: "Dev Patel"
+          }
+        ]);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchDashboardData();
+
+    // Real-time listener: immediately prepend logged anomaly without any page reload
+    const handleLiveAnomaly = (e: any) => {
+      const newAnomaly = e.detail;
+      if (newAnomaly) {
+        setRecentIssues((prev) => [newAnomaly, ...prev.filter((a) => a.id !== newAnomaly.id)]);
+        setMetrics((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            total_anomalies: (prev.total_anomalies || 0) + 1,
+            active_critical: newAnomaly.severity === 'CRITICAL' ? (prev.active_critical || 0) + 1 : prev.active_critical,
+            pending_capa: (prev.pending_capa || 0) + 1,
+          };
+        });
+        setFeaturedAnomaly((prev) => ({
+          ...prev,
+          title: newAnomaly.title || prev.title,
+          machine_line: `${newAnomaly.machine_id || 'SMT-LINE'} - ${newAnomaly.production_line || 'Active Line'}`,
+          severity: newAnomaly.severity || prev.severity,
+          status: newAnomaly.status || 'CAPA_PENDING',
+          sensor_name: newAnomaly.metric_name || prev.sensor_name,
+          sensor_value: newAnomaly.metric_value ? String(newAnomaly.metric_value) : prev.sensor_value,
+          threshold_value: newAnomaly.threshold_value ? String(newAnomaly.threshold_value) : prev.threshold_value,
+          operator: newAnomaly.operator_name || prev.operator,
+        }));
+        showToast(`Real-Time Log Recorded: "${newAnomaly.title}"`);
+      }
+      fetchDashboardData(true);
+    };
+
+    const handleCreated = () => {
+      fetchDashboardData(true);
+    };
+
+    window.addEventListener('anomaly-created-live', handleLiveAnomaly);
+    window.addEventListener('anomaly-created', handleCreated);
+
+    // Silent background auto-sync interval (every 3.5 seconds) for live shopfloor updates
+    const syncInterval = setInterval(() => {
+      fetchDashboardData(true);
+    }, 3500);
+
+    return () => {
+      window.removeEventListener('anomaly-created-live', handleLiveAnomaly);
+      window.removeEventListener('anomaly-created', handleCreated);
+      clearInterval(syncInterval);
+    };
   }, []);
 
   const handleGenerateCAPA = () => {
@@ -190,10 +241,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="font-mono text-xs text-slate-500 uppercase">Spotlight Incident</span>
-              <span className="font-mono text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                UUID: {featuredAnomaly.id}
-              </span>
+              <span className="font-mono text-xs text-slate-500 uppercase tracking-wide">Spotlight Incident</span>
             </div>
             <h2 className="text-2xl font-semibold text-slate-900 tracking-tight">{featuredAnomaly.title}</h2>
             <p className="text-slate-500 text-sm mt-1">Location: {featuredAnomaly.machine_line}</p>
@@ -370,6 +418,63 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Centered Log Anomaly Intake Station (Middle of Screen) */}
+      <div className="bg-white border border-slate-200/90 rounded-xl p-6 sm:p-8 shadow-xs text-center relative overflow-hidden transition-all hover:border-slate-300">
+        <div className="max-w-2xl mx-auto flex flex-col items-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium mb-3">
+            <span className="w-2 h-2 rounded-full bg-green-600 animate-pulse"></span>
+            <span className="tracking-wide uppercase text-[10px] font-semibold text-slate-600">Live Intake Station &bull; Real-Time Synced</span>
+          </div>
+
+          <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+            Log Manufacturing Anomaly
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1.5 max-w-lg leading-relaxed">
+            Record machine drift, AOI optical defects, pressure anomalies, or thermal excursion directly into the telemetry register.
+          </p>
+
+          {/* Centered Actions */}
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 w-full sm:w-auto">
+            <button
+              onClick={onOpenCreateModal}
+              className="flex items-center justify-center gap-2.5 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold transition-all shadow-sm hover:shadow-md cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0"
+              title="Open Anomaly Intake Modal (Shift + N)"
+            >
+              <Plus size={18} className="text-brand-400" />
+              <span>Log Anomaly</span>
+              <kbd className="hidden sm:inline-flex items-center ml-2 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-[10px] text-slate-300">
+                Shift + N
+              </kbd>
+            </button>
+
+            <button
+              onClick={onOpenCreateModal}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors shadow-xs cursor-pointer"
+            >
+              <Activity size={16} className="text-brand-600" />
+              <span>Voice / Audio Memo</span>
+            </button>
+          </div>
+
+          {/* Real-time badges */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[11px] text-slate-500 font-medium">
+            <span className="flex items-center gap-1.5 text-green-700">
+              <CheckCircle2 size={13} className="text-green-600" />
+              Zero Refresh Required
+            </span>
+            <span className="hidden sm:inline text-slate-300">&bull;</span>
+            <span className="flex items-center gap-1.5 text-slate-600">
+              <Sparkles size={13} className="text-brand-500" />
+              Automated 8D CAPA Synthesis
+            </span>
+            <span className="hidden sm:inline text-slate-300">&bull;</span>
+            <span className="text-slate-500">
+              Instant Supabase Log Broadcast
+            </span>
+          </div>
         </div>
       </div>
 
