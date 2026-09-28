@@ -7,7 +7,7 @@ import {
   CheckCircle2, 
   RotateCcw, 
   Cpu, 
-  AlertTriangle,
+  AlertCircle,
   ShieldCheck,
   Zap
 } from 'lucide-react';
@@ -64,11 +64,11 @@ export const FiveWhysCopilotModal: React.FC<FiveWhysCopilotModalProps> = ({
       setQuickOptions(res.quick_options || []);
     } catch (err) {
       console.warn('5-whys error, using initial step fallback', err);
-      setCurrentQuestion(`Why did ${anomaly.machine_id} exceed operational threshold?`);
+      setCurrentQuestion(`Why did ${anomaly.machine_id} exceed operational threshold during shift?`);
       setQuickOptions([
-        'Coolant valve jammed closed',
-        'Excessive friction & bearing vibration',
-        'Electrical supply voltage sag',
+        'Sensor probe calibrated incorrectly',
+        'Excessive friction & thermal overload',
+        'Contaminant buildup on contact zones',
       ]);
     } finally {
       setLoading(false);
@@ -81,21 +81,19 @@ export const FiveWhysCopilotModal: React.FC<FiveWhysCopilotModalProps> = ({
     }
   }, [isOpen, anomaly]);
 
-  if (!isOpen || !anomaly) return null;
-
-  const handleStepSubmit = async (answerText: string) => {
-    if (!answerText.trim() || loading) return;
-
-    const updatedHistory: FiveWhysHistoryItem[] = [
-      ...history,
-      { step, question: currentQuestion, answer: answerText.trim() },
-    ];
-    setHistory(updatedHistory);
-    setTechnicianInput('');
-
-    const nextStep = step + 1;
-    setStep(nextStep);
+  const handleStepSubmit = async (selectedAnswer: string) => {
+    if (!selectedAnswer.trim() || !anomaly) return;
     setLoading(true);
+
+    const newHistoryItem: FiveWhysHistoryItem = {
+      step,
+      question: currentQuestion,
+      answer: selectedAnswer.trim(),
+    };
+
+    const nextHistory = [...history, newHistoryItem];
+    setHistory(nextHistory);
+    setTechnicianInput('');
 
     try {
       const res = await anomalyApi.process5WhysStep({
@@ -106,34 +104,46 @@ export const FiveWhysCopilotModal: React.FC<FiveWhysCopilotModalProps> = ({
         metric_name: anomaly.metric_name,
         metric_value: anomaly.metric_value,
         threshold_value: anomaly.threshold_value,
-        step: nextStep,
-        history: updatedHistory,
-        technician_input: answerText.trim(),
+        step: step + 1,
+        history: nextHistory,
+        technician_input: selectedAnswer.trim(),
       });
 
-      if (res.is_final_step || nextStep >= 5) {
+      if (res.is_final_step || step >= 4) {
         setIsFinalStep(true);
-        setSynthesizedRootCause(res.synthesized_root_cause || '');
-        setSuggestedCorrective(res.suggested_corrective_action || '');
-        setSuggestedPreventive(res.suggested_preventive_action || '');
+        setSynthesizedRootCause(
+          res.synthesized_root_cause ||
+            `Root cause determined: Sensor calibration drift combined with inadequate maintenance interval on ${anomaly.machine_id}.`
+        );
+        setSuggestedCorrective(
+          res.suggested_corrective_action ||
+            `Recalibrate ${anomaly.machine_id} sensors and replace worn interface seals.`
+        );
+        setSuggestedPreventive(
+          res.suggested_preventive_action ||
+            `Institute daily 15-minute diagnostic checks on ${anomaly.production_line}.`
+        );
       } else {
+        setStep(res.current_step || step + 1);
         setCurrentQuestion(res.why_question);
         setQuickOptions(res.quick_options || []);
       }
     } catch (err) {
-      if (nextStep >= 5) {
+      console.warn('5-whys next step fallback', err);
+      if (step >= 3) {
         setIsFinalStep(true);
         setSynthesizedRootCause(
-          `Root Cause: Component degradation on ${anomaly.machine_id} compounded by skipped filter inspection and delayed lubrication maintenance.`
+          `Synthesized Root Cause: Root cause established as mechanical tolerance breakdown under continuous shift load on ${anomaly.machine_id}.`
         );
-        setSuggestedCorrective(`Inspect and replace damaged seals on ${anomaly.machine_id} and retorque to factory spec.`);
-        setSuggestedPreventive(`Upgrade maintenance checklist and install automated vibration telemetry alarm threshold.`);
+        setSuggestedCorrective('Perform emergency rebuild and sensor recalibration.');
+        setSuggestedPreventive('Schedule weekly spectroscopic and thermal monitoring.');
       } else {
-        setCurrentQuestion(`Why did '${answerText.trim()}' occur during line operation?`);
+        setStep(step + 1);
+        setCurrentQuestion(`Why did ${selectedAnswer.slice(0, 35)} occur in the preceding stage?`);
         setQuickOptions([
-          'Filter element contaminated',
-          'Service cycle interval overdue',
-          'Mechanical clamp loose',
+          'Thermal runaway beyond dissipation limit',
+          'Inadequate lubrication frequency',
+          'Particulate contamination in fluid circuit',
         ]);
       }
     } finally {
@@ -141,7 +151,8 @@ export const FiveWhysCopilotModal: React.FC<FiveWhysCopilotModalProps> = ({
     }
   };
 
-  const handleApplyToCapa = async () => {
+  const handleApplyRootCause = async () => {
+    if (!anomaly) return;
     try {
       setIsApplying(true);
       await anomalyApi.generateCapa(anomaly.id);
@@ -161,73 +172,77 @@ export const FiveWhysCopilotModal: React.FC<FiveWhysCopilotModalProps> = ({
     }
   };
 
+  if (!isOpen || !anomaly) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+      <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh] text-slate-800">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-950/70">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
-              <Sparkles className="w-5 h-5" />
+            <div className="p-2 rounded bg-slate-100 text-slate-700 border border-slate-200">
+              <HelpCircle className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-bold text-white">Interactive 5-Whys Diagnostic Copilot</h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                  Floor Assistant
+                <h3 className="text-base font-semibold text-slate-900">
+                  Interactive 5-Whys Diagnostic Assistant
+                </h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-200 text-slate-700">
+                  AI Root Cause
                 </span>
               </div>
-              <p className="text-xs text-zinc-400">
-                Guiding shop floor technicians step-by-step to the true root cause
+              <p className="text-xs text-slate-500">
+                Drill down to root cause through conversational Socratic inquiry
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors duration-150 ease-linear"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Incident Summary Card */}
-        <div className="px-6 py-3 bg-zinc-950/40 border-b border-zinc-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+        {/* Anomaly Context Banner */}
+        <div className="px-6 py-2.5 bg-slate-50/70 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-orange-400" />
-            <span className="font-mono font-bold text-white">{anomaly.machine_id}</span>
-            <span className="text-zinc-500">|</span>
-            <span className="text-zinc-300">{anomaly.production_line}</span>
+            <span className="font-mono text-slate-800 font-semibold px-2 py-0.5 bg-white border border-slate-200 rounded">
+              {anomaly.machine_id}
+            </span>
+            <span className="font-semibold text-slate-900">{anomaly.title}</span>
           </div>
           <div className="flex items-center gap-2">
             {anomaly.metric_name && (
-              <span className="text-zinc-400">
-                {anomaly.metric_name}: <strong className="text-red-400 font-mono">{anomaly.metric_value}</strong> (Limit: {anomaly.threshold_value})
+              <span className="text-slate-500">
+                {anomaly.metric_name}: <strong className="text-red-700 font-mono">{anomaly.metric_value}</strong> (Limit: {anomaly.threshold_value})
               </span>
             )}
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-300">
+            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
               {anomaly.severity}
             </span>
           </div>
         </div>
 
         {/* 5-Whys Progress Tracker */}
-        <div className="px-6 py-3 bg-zinc-900 border-b border-zinc-800">
-          <div className="flex items-center justify-between mb-1.5 text-xs font-semibold">
-            <span className="text-orange-400 uppercase tracking-wider">
+        <div className="px-6 py-3 bg-white border-b border-slate-200">
+          <div className="flex items-center justify-between mb-1.5 text-xs font-medium">
+            <span className="text-slate-800 font-semibold uppercase tracking-wider">
               {isFinalStep ? 'Diagnostic Tree Complete' : `Diagnostic Step ${step} of 5`}
             </span>
-            <span className="text-zinc-400">{Math.min(100, Math.round((step / 5) * 100))}% Explored</span>
+            <span className="text-slate-500 font-mono">{Math.min(100, Math.round((step / 5) * 100))}% Explored</span>
           </div>
-          <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden flex gap-1">
+          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden flex gap-1">
             {[1, 2, 3, 4, 5].map((s) => (
               <div
                 key={s}
-                className={`flex-1 h-full transition-all duration-300 ${
+                className={`flex-1 h-full transition-colors duration-150 ease-linear ${
                   s < step
-                    ? 'bg-emerald-500'
+                    ? 'bg-green-700'
                     : s === step
-                    ? 'bg-orange-500'
-                    : 'bg-zinc-700/50'
+                    ? 'bg-slate-700'
+                    : 'bg-slate-200'
                 }`}
               />
             ))}
@@ -238,21 +253,21 @@ export const FiveWhysCopilotModal: React.FC<FiveWhysCopilotModalProps> = ({
         <div className="p-6 space-y-4 overflow-y-auto flex-1">
           {/* Prior History Chain */}
           {history.length > 0 && (
-            <div className="space-y-2.5 pb-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">
+            <div className="space-y-2 pb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 Reasoning Trail (5-Whys Chain)
               </span>
               {history.map((item, idx) => (
                 <div
                   key={idx}
-                  className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800/80 text-xs space-y-1"
+                  className="p-3 rounded-md bg-slate-50 border border-slate-200 text-xs space-y-1"
                 >
-                  <div className="flex items-center gap-1.5 text-orange-400 font-semibold">
-                    <HelpCircle className="w-3.5 h-3.5" />
+                  <div className="flex items-center gap-1.5 text-slate-900 font-medium">
+                    <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
                     <span>Why #{item.step}: {item.question}</span>
                   </div>
-                  <div className="pl-5 text-zinc-300 font-medium flex items-center gap-1">
-                    <span className="text-emerald-400">↳ Observation:</span>
+                  <div className="pl-5 text-slate-600 flex items-center gap-1">
+                    <span className="text-slate-900 font-medium">↳ Observation:</span>
                     <span>{item.answer}</span>
                   </div>
                 </div>
@@ -263,20 +278,20 @@ export const FiveWhysCopilotModal: React.FC<FiveWhysCopilotModalProps> = ({
           {/* Current Question or Final Conclusion */}
           {!isFinalStep ? (
             <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-transparent border border-orange-500/30">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-orange-400 mb-1">
-                  <Zap className="w-4 h-4" />
+              <div className="p-4 rounded-md bg-slate-50 border border-slate-200">
+                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  <Zap className="w-4 h-4 text-slate-500" />
                   <span>AI Diagnostic Prompt (Step {step})</span>
                 </div>
-                <p className="text-sm font-semibold text-white">
+                <p className="text-sm font-semibold text-slate-900">
                   {loading ? 'Analyzing telemetry and formulating next Why question...' : currentQuestion}
                 </p>
               </div>
 
-              {/* Quick Response Chips (Designed for glove touch on shopfloor) */}
+              {/* Quick Response Chips */}
               <div className="space-y-2">
-                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                  Quick-Response Chips (Tap to select)
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Quick-Response Observations (Tap to select)
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {quickOptions.map((opt, i) => (
@@ -285,25 +300,25 @@ export const FiveWhysCopilotModal: React.FC<FiveWhysCopilotModalProps> = ({
                       type="button"
                       disabled={loading}
                       onClick={() => handleStepSubmit(opt)}
-                      className="p-3 text-left rounded-xl bg-zinc-950 hover:bg-orange-500/15 hover:border-orange-500/40 border border-zinc-800 text-xs text-zinc-200 font-medium transition active:scale-95 disabled:opacity-50 flex items-center justify-between"
+                      className="p-3 text-left rounded-md bg-white hover:bg-slate-50 border border-slate-200 text-xs text-slate-800 font-medium transition-colors duration-150 ease-linear disabled:opacity-50 flex items-center justify-between cursor-pointer"
                     >
                       <span>{opt}</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-orange-400 shrink-0 ml-1" />
+                      <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-1" />
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Or Custom 1-Sentence Observation */}
+              {/* Custom Observation Input */}
               <div className="space-y-2 pt-2">
-                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
                   Or Type Custom Shopfloor Observation
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     disabled={loading}
-                    placeholder="e.g. Filter differential pressure gage reading high..."
+                    placeholder="e.g. Thermocouple surface sensor has flux accumulation..."
                     value={technicianInput}
                     onChange={(e) => setTechnicianInput(e.target.value)}
                     onKeyDown={(e) => {
@@ -312,13 +327,13 @@ export const FiveWhysCopilotModal: React.FC<FiveWhysCopilotModalProps> = ({
                         handleStepSubmit(technicianInput);
                       }
                     }}
-                    className="flex-1 px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-white text-xs focus:outline-none focus:border-orange-500 disabled:opacity-50"
+                    className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-md text-slate-900 text-xs focus:outline-none focus:border-slate-500 focus:bg-white transition-colors duration-150 ease-linear disabled:opacity-50"
                   />
                   <button
                     type="button"
                     disabled={!technicianInput.trim() || loading}
                     onClick={() => handleStepSubmit(technicianInput)}
-                    className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-zinc-950 font-bold text-xs rounded-xl transition shadow-lg shadow-orange-500/20 disabled:opacity-50 flex items-center gap-1.5"
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs rounded-md transition-colors duration-150 ease-linear disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>Next</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -328,39 +343,39 @@ export const FiveWhysCopilotModal: React.FC<FiveWhysCopilotModalProps> = ({
             </div>
           ) : (
             /* Final Concluded Root Cause & CAPA */
-            <div className="space-y-4 animate-fade-in">
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="space-y-4">
+              <div className="p-4 rounded-md bg-green-50 border border-green-200 flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-green-700 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-bold text-emerald-400">5-Whys Root Cause Identified</h4>
-                  <p className="text-xs text-zinc-200 mt-1 leading-relaxed">
+                  <h4 className="text-sm font-semibold text-green-800">5-Whys Root Cause Synthesized</h4>
+                  <p className="text-xs text-slate-700 mt-1 leading-relaxed">
                     {synthesizedRootCause}
                   </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div className="p-3.5 bg-zinc-950 rounded-xl border border-zinc-800 space-y-1">
-                  <span className="font-bold text-orange-400 uppercase tracking-wider block">
+                <div className="p-3.5 bg-slate-50 rounded-md border border-slate-200 space-y-1">
+                  <span className="font-semibold text-slate-900 uppercase tracking-wider block">
                     Immediate Corrective Action
                   </span>
-                  <p className="text-zinc-300 leading-relaxed">
+                  <p className="text-slate-600 leading-relaxed">
                     {suggestedCorrective || 'Inspect components and recalibrate line parameters to baseline.'}
                   </p>
                 </div>
 
-                <div className="p-3.5 bg-zinc-950 rounded-xl border border-zinc-800 space-y-1">
-                  <span className="font-bold text-emerald-400 uppercase tracking-wider block">
+                <div className="p-3.5 bg-slate-50 rounded-md border border-slate-200 space-y-1">
+                  <span className="font-semibold text-slate-900 uppercase tracking-wider block">
                     Long-term Preventive Action
                   </span>
-                  <p className="text-zinc-300 leading-relaxed">
+                  <p className="text-slate-600 leading-relaxed">
                     {suggestedPreventive || 'Implement digitized checklist and weekly automated telemetry verification.'}
                   </p>
                 </div>
               </div>
 
               {saveSuccess && (
-                <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs text-center font-bold">
+                <div className="p-3 rounded-md bg-green-50 border border-green-200 text-green-800 text-xs text-center font-medium">
                   ✓ Successfully saved to CAPA Register! Anomaly status updated to CAPA_PENDING.
                 </div>
               )}
@@ -369,22 +384,22 @@ export const FiveWhysCopilotModal: React.FC<FiveWhysCopilotModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-800 bg-zinc-950/60">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
           <button
             type="button"
             onClick={initFirstStep}
             disabled={loading || isApplying}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs text-zinc-400 hover:text-white transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900 transition-colors duration-150 ease-linear cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Restart 5-Whys</span>
+            <span>Restart Inquiry</span>
           </button>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs text-zinc-400 hover:text-white transition"
+              className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors duration-150 ease-linear cursor-pointer"
             >
               Close
             </button>
@@ -392,11 +407,11 @@ export const FiveWhysCopilotModal: React.FC<FiveWhysCopilotModalProps> = ({
               <button
                 type="button"
                 disabled={isApplying || saveSuccess}
-                onClick={handleApplyToCapa}
-                className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-zinc-950 font-bold px-4 py-2 rounded-xl text-xs transition shadow-lg shadow-orange-500/20 disabled:opacity-50"
+                onClick={handleApplyRootCause}
+                className="flex items-center gap-1.5 px-4 py-2 bg-green-700 hover:bg-green-800 text-white font-medium text-xs rounded-md transition-colors duration-150 ease-linear shadow-xs cursor-pointer"
               >
-                <ShieldCheck className="w-4 h-4" />
-                <span>{isApplying ? 'Applying...' : 'Apply to CAPA Register'}</span>
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Save to CAPA Register</span>
               </button>
             )}
           </div>

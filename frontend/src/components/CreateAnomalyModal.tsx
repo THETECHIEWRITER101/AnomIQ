@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
-  AlertTriangle, 
+  AlertCircle, 
   Cpu, 
   User, 
   CheckCircle2, 
@@ -10,8 +10,7 @@ import {
   Sparkles, 
   Upload, 
   FileWarning, 
-  Image as ImageIcon,
-  Clock
+  Image as ImageIcon
 } from 'lucide-react';
 import { anomalyApi, CreateAnomalyPayload, DuplicateMatch } from '../services/api';
 import { compressImageToWebP } from '../utils/imageCompression';
@@ -51,7 +50,6 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
 
   // Duplicate Clustering State
   const [duplicateMatches, setDuplicateMatches] = useState<DuplicateMatch[]>([]);
-  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
   const debounceTimerRef = useRef<any>(null);
 
   // Image Upload & Compression State
@@ -59,40 +57,30 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
   const [imageCompressionInfo, setImageCompressionInfo] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Check duplicates when title changes
+  // Real-time duplicate check with debounce
   useEffect(() => {
-    if (!formData.title || formData.title.trim().length < 5) {
-      setDuplicateMatches([]);
-      return;
-    }
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = setTimeout(async () => {
-      try {
-        setIsCheckingDuplicates(true);
-        const res = await anomalyApi.checkDuplicates(formData.title.trim());
-        setDuplicateMatches(res.matches || []);
-      } catch (err) {
-        console.warn('Duplicate check unavailable', err);
-      } finally {
-        setIsCheckingDuplicates(false);
-      }
-    }, 450);
-
-    return () => {
+    if (formData.title.trim().length > 4) {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    };
+      debounceTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await anomalyApi.checkDuplicates(formData.title, 24);
+          if (res.is_duplicate_suspected) {
+            setDuplicateMatches(res.matches || []);
+          } else {
+            setDuplicateMatches([]);
+          }
+        } catch (e) {
+          console.warn('Duplicate check failed', e);
+        }
+      }, 500);
+    } else {
+      setDuplicateMatches([]);
+    }
   }, [formData.title]);
 
-  // Voice recording toggle via Web Speech API
   const toggleVoiceRecording = () => {
     if (isRecording) {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+      if (recognitionRef.current) recognitionRef.current.stop();
       setIsRecording(false);
       return;
     }
@@ -101,7 +89,6 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      // Browser fallback demo memo for environments without SpeechRecognition
       const fallbackMemo =
         "Stamping Line 2 hydraulic ram has high pressure spike and severe vibration exceeding limits";
       setVoiceTranscript(fallbackMemo);
@@ -169,7 +156,6 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
     }
   };
 
-  // Image selection and client-side WebP compression
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -177,8 +163,7 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
     try {
       const { dataUrl, sizeReductionRatio } = await compressImageToWebP(file, 1280, 720, 0.75);
       setImagePreview(dataUrl);
-      setImageCompressionInfo(`Compressed to WebP (reduced by ${sizeReductionRatio}%)`);
-      // In production with Supabase Storage, dataUrl would be uploaded to storage bucket and return CDN url
+      setImageCompressionInfo(`Compressed to WebP (-${sizeReductionRatio}%)`);
       setFormData((prev) => ({ ...prev, image_url: dataUrl.slice(0, 300) }));
     } catch (err) {
       console.error('Image compression error', err);
@@ -208,62 +193,62 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
+      <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh] text-slate-800">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-950/70">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
-              <AlertTriangle className="w-5 h-5" />
+            <div className="p-2 rounded bg-slate-100 text-slate-700 border border-slate-200">
+              <AlertCircle className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-bold text-white">Log Manufacturing Anomaly</h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-800 text-orange-400 border border-orange-500/20">
+                <h3 className="text-base font-semibold text-slate-900">Log Manufacturing Anomaly</h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-slate-200 text-slate-700">
                   Floor Mode Ready
                 </span>
               </div>
-              <p className="text-xs text-zinc-400">Record hardware failure, sensor breach, or line stoppage</p>
+              <p className="text-xs text-slate-500">Record hardware failure, sensor breach, or line stoppage</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition"
+            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors duration-150 ease-linear"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Zero-Cost Voice-to-Defect Intake (Floor Mode Banner) */}
-        <div className="px-6 py-3.5 bg-gradient-to-r from-orange-500/10 via-zinc-950 to-zinc-950 border-b border-zinc-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Floor Mode Voice Intake Banner */}
+        <div className="px-6 py-3 bg-slate-50/80 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={toggleVoiceRecording}
-              className={`p-2.5 rounded-xl flex items-center gap-2 text-xs font-bold transition shadow-lg ${
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 text-xs font-medium transition-colors duration-150 ease-linear cursor-pointer ${
                 isRecording
-                  ? 'bg-red-500 text-white animate-pulse shadow-red-500/30'
-                  : 'bg-orange-500 hover:bg-orange-600 text-zinc-950 shadow-orange-500/20'
+                  ? 'bg-red-700 text-white animate-pulse'
+                  : 'bg-slate-800 hover:bg-slate-900 text-white'
               }`}
             >
               {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
               <span>{isRecording ? 'Listening...' : 'Floor Mode: Voice Memo'}</span>
             </button>
-            <div className="text-xs text-zinc-400">
+            <div className="text-xs text-slate-500">
               {isParsingVoice ? (
-                <span className="text-orange-400 flex items-center gap-1.5 font-semibold">
+                <span className="text-slate-800 flex items-center gap-1.5 font-medium">
                   <Sparkles className="w-3.5 h-3.5 animate-spin" />
-                  Gemini Flash parsing voice memo...
+                  Gemini parsing spoken memo...
                 </span>
               ) : isRecording ? (
-                <span className="text-red-400 font-medium">Recording operator speech...</span>
+                <span className="text-red-700 font-medium">Recording operator speech...</span>
               ) : (
-                <span>Operators wearing gloves can speak to auto-fill ticket</span>
+                <span>Speak to auto-fill ticket while on shopfloor</span>
               )}
             </div>
           </div>
 
-          {/* Quick Voice Simulation Buttons (For testing anywhere without microphone) */}
+          {/* Quick Voice Simulation Buttons */}
           <div className="flex items-center gap-1.5 text-[11px]">
             <button
               type="button"
@@ -272,8 +257,7 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
                 setVoiceTranscript(sample);
                 handleProcessVoice(sample);
               }}
-              className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition"
-              title="Test Voice Memo Intake Sample"
+              className="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded text-[11px] transition-colors duration-150 ease-linear cursor-pointer"
             >
               Sample: Press Spike
             </button>
@@ -284,8 +268,7 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
                 setVoiceTranscript(sample);
                 handleProcessVoice(sample);
               }}
-              className="px-2 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition"
-              title="Test Voice Memo Intake Sample"
+              className="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded text-[11px] transition-colors duration-150 ease-linear cursor-pointer"
             >
               Sample: Weld Heat
             </button>
@@ -295,62 +278,61 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
           {error && (
-            <div className="p-3 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl">
+            <div className="p-3 text-xs bg-red-50 border border-red-200 text-red-700 rounded-md">
               {error}
             </div>
           )}
 
-          {/* Voice transcript readout if present */}
           {voiceTranscript && (
-            <div className="p-3 rounded-xl bg-zinc-950/80 border border-orange-500/20 text-xs text-zinc-300 flex items-start gap-2">
-              <Sparkles className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+            <div className="p-3 rounded-md bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-start gap-2">
+              <Sparkles className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
               <div>
-                <span className="text-orange-400 font-semibold block">Spoken Transcription:</span>
-                <p className="italic">{voiceTranscript}</p>
+                <span className="text-slate-900 font-semibold block">Spoken Transcription:</span>
+                <p className="italic text-slate-600">{voiceTranscript}</p>
               </div>
             </div>
           )}
 
           {/* Anomaly Title */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
               Anomaly Title *
             </label>
             <input
               type="text"
               required
-              placeholder="e.g. Spindle bearing vibration spike on Line A"
+              placeholder="e.g. Solder bridging on BGA power rail"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:border-orange-500 transition"
+              className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-md text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-slate-500 focus:bg-white transition-colors duration-150 ease-linear"
             />
           </div>
 
-          {/* Duplicate & Recurrence Clustering Alert (pg_trgm Search) */}
+          {/* Duplicate Clustering Alert */}
           {duplicateMatches.length > 0 && (
-            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2 animate-fade-in">
-              <div className="flex items-center gap-2 text-amber-400 font-bold">
+            <div className="p-3.5 rounded-md bg-amber-50 border border-amber-200 text-xs space-y-2">
+              <div className="flex items-center gap-1.5 text-amber-800 font-semibold">
                 <FileWarning className="w-4 h-4" />
-                <span>Shift Recurrence Warning: Potential Duplicate Detected (pg_trgm)</span>
+                <span>Shift Recurrence Warning: Potential Duplicate Detected</span>
               </div>
-              <p className="text-zinc-300 leading-relaxed">
-                A similar defect was reported within the last 24 hours. Verify if this is the same line stoppage before filing:
+              <p className="text-slate-700 leading-relaxed">
+                A similar defect was reported within the last 24 hours. Verify if this is the same recurrence:
               </p>
               <div className="space-y-1.5 pt-1">
                 {duplicateMatches.map((match) => (
                   <div
                     key={match.id}
-                    className="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800/80 flex items-center justify-between text-[11px]"
+                    className="p-2 rounded bg-white border border-amber-200 flex items-center justify-between text-[11px]"
                   >
                     <div>
-                      <span className="font-bold text-white">#{match.id} {match.title}</span>
-                      <span className="text-zinc-400 ml-2 font-mono">({match.machine_id} - {match.production_line})</span>
+                      <span className="font-semibold text-slate-900">#{match.id} {match.title}</span>
+                      <span className="text-slate-500 ml-2 font-mono">({match.machine_id} - {match.production_line})</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-amber-400 font-bold font-mono">
+                      <span className="text-amber-800 font-bold font-mono">
                         {Math.round(match.similarity_score * 100)}% match
                       </span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] bg-zinc-800 text-zinc-300 font-bold">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] bg-slate-100 text-slate-700 font-semibold">
                         {match.status}
                       </span>
                     </div>
@@ -363,31 +345,32 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
           {/* Machine ID and Production Line */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
                 Machine ID *
               </label>
               <div className="relative">
-                <Cpu className="absolute left-3.5 top-3 w-4 h-4 text-zinc-500" />
+                <Cpu className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
                   required
-                  placeholder="e.g. CNC-MILL-04"
+                  placeholder="e.g. SMT-LINE-01"
                   value={formData.machine_id}
                   onChange={(e) => setFormData({ ...formData, machine_id: e.target.value })}
-                  className="w-full pl-10 pr-3.5 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:border-orange-500 transition"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-slate-500 focus:bg-white transition-colors duration-150 ease-linear font-mono"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
                 Production Line *
               </label>
               <select
                 value={formData.production_line}
                 onChange={(e) => setFormData({ ...formData, production_line: e.target.value })}
-                className="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:border-orange-500 transition"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-slate-500 focus:bg-white transition-colors duration-150 ease-linear cursor-pointer"
               >
+                <option value="SMT Surface Mount Line 1">SMT Surface Mount Line 1</option>
                 <option value="Line A - Precision Machining">Line A - Precision Machining</option>
                 <option value="Line B - Hydraulic Press & Stamping">Line B - Hydraulic Press & Stamping</option>
                 <option value="Line C - Robotic Welding">Line C - Robotic Welding</option>
@@ -400,7 +383,7 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
           {/* Severity & Operator */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
                 Severity Level *
               </label>
               <select
@@ -408,72 +391,72 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
                 onChange={(e) =>
                   setFormData({ ...formData, severity: e.target.value as CreateAnomalyPayload['severity'] })
                 }
-                className="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:border-orange-500 transition"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-slate-500 focus:bg-white transition-colors duration-150 ease-linear cursor-pointer"
               >
                 <option value="CRITICAL">CRITICAL (Immediate Shutdown)</option>
                 <option value="HIGH">HIGH (Urgent Attention Required)</option>
                 <option value="MEDIUM">MEDIUM (Degraded Performance)</option>
-                <option value="LOW">LOW (Informational / Minor Drift)</option>
+                <option value="LOW">LOW (Minor Drift / Warning)</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
-                Operator / Inspector
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Operator / Shift Lead
               </label>
               <div className="relative">
-                <User className="absolute left-3.5 top-3 w-4 h-4 text-zinc-500" />
+                <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="e.g. Rahul Sharma"
+                  placeholder="e.g. Dev Patel"
                   value={formData.operator_name || ''}
                   onChange={(e) => setFormData({ ...formData, operator_name: e.target.value })}
-                  className="w-full pl-10 pr-3.5 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:border-orange-500 transition"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-slate-500 focus:bg-white transition-colors duration-150 ease-linear"
                 />
               </div>
             </div>
           </div>
 
           {/* Telemetry Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-zinc-950/60 p-3 rounded-xl border border-zinc-800/80">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-md border border-slate-200">
             <div>
-              <label className="block text-[11px] font-medium text-zinc-400 mb-1">Metric Monitored</label>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1">Sensor Tag</label>
               <input
                 type="text"
-                placeholder="e.g. Vibration, Temp"
+                placeholder="e.g. Reflow Peak Temp"
                 value={formData.metric_name || ''}
                 onChange={(e) => setFormData({ ...formData, metric_name: e.target.value })}
-                className="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-white text-xs"
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-slate-900 text-xs"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-zinc-400 mb-1">Observed Value</label>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1">Observed Value</label>
               <input
                 type="number"
                 step="0.01"
-                placeholder="8.4"
+                placeholder="268.4"
                 value={formData.metric_value || ''}
                 onChange={(e) => setFormData({ ...formData, metric_value: parseFloat(e.target.value) || undefined })}
-                className="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-white text-xs"
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-slate-900 text-xs font-mono"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-zinc-400 mb-1">Threshold Limit</label>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1">Threshold Limit</label>
               <input
                 type="number"
                 step="0.01"
-                placeholder="4.5"
+                placeholder="245.0"
                 value={formData.threshold_value || ''}
                 onChange={(e) => setFormData({ ...formData, threshold_value: parseFloat(e.target.value) || undefined })}
-                className="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-white text-xs"
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded text-slate-900 text-xs font-mono"
               />
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
-              Detailed Description & Observation *
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              Detailed Observation *
             </label>
             <textarea
               required
@@ -481,19 +464,19 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
               placeholder="Describe physical symptoms, noise patterns, or sensor readouts..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3.5 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:border-orange-500 transition resize-none"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-slate-900 text-xs sm:text-sm focus:outline-none focus:border-slate-500 focus:bg-white transition-colors duration-150 ease-linear resize-none"
             />
           </div>
 
-          {/* WebP Defect Photo Compression (Supabase Storage Optimization) */}
-          <div className="bg-zinc-950/40 p-3 rounded-xl border border-zinc-800/80">
+          {/* WebP Defect Photo Compression */}
+          <div className="bg-slate-50 p-3 rounded-md border border-slate-200">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
-                <ImageIcon className="w-3.5 h-3.5 text-orange-400" />
-                Defect Photo (Client-Side WebP Compression)
+              <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-slate-500" />
+                Defect Visual (WebP Optimized)
               </span>
               {imageCompressionInfo && (
-                <span className="text-[10px] text-emerald-400 font-medium">{imageCompressionInfo}</span>
+                <span className="text-[10px] text-green-700 font-medium">{imageCompressionInfo}</span>
               )}
             </div>
 
@@ -509,7 +492,7 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-lg text-xs font-semibold transition"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-md text-xs font-medium transition-colors duration-150 ease-linear cursor-pointer"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Upload Defect Photo</span>
@@ -520,7 +503,7 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
                   <img
                     src={imagePreview}
                     alt="Defect preview"
-                    className="w-10 h-10 object-cover rounded-lg border border-zinc-700"
+                    className="w-10 h-10 object-cover rounded border border-slate-200"
                   />
                   <button
                     type="button"
@@ -529,7 +512,7 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
                       setImageCompressionInfo(null);
                       setFormData((p) => ({ ...p, image_url: '' }));
                     }}
-                    className="text-xs text-red-400 hover:underline"
+                    className="text-xs text-red-700 hover:underline cursor-pointer"
                   >
                     Remove
                   </button>
@@ -539,25 +522,25 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
           </div>
 
           {/* Footer buttons */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs sm:text-sm font-medium text-zinc-400 hover:text-white transition"
+              className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors duration-150 ease-linear cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-zinc-950 font-bold px-5 py-2.5 rounded-xl text-xs sm:text-sm transition shadow-lg shadow-orange-500/20 disabled:opacity-50"
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-medium px-4 py-2 rounded-md text-xs transition-colors duration-150 ease-linear shadow-xs disabled:opacity-50 cursor-pointer"
             >
               {isSubmitting ? (
-                <>Logging Anomaly...</>
+                <>Logging...</>
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Submit Anomaly Ticket</span>
+                  <span>Submit Anomaly</span>
                 </>
               )}
             </button>

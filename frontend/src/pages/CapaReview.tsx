@@ -37,10 +37,10 @@ export const CapaReview: React.FC = () => {
         {
           id: 1,
           anomaly_id: 1,
-          root_cause: "Fatigue spalling on the inner race of the drive-end angular contact spindle bearing due to lubricant starvation during high-speed cycle runs.",
-          containment_action: "Halt Line A milling sequence. Tag in-process components and isolate machine spindle.",
-          corrective_action: "Flush lubrication reservoir, inspect spindle runout, and replace dual-row bearing assembly with OEM SKF 7014-CD/P4A.",
-          preventive_action: "Upgrade automated oil-air mister nozzle frequency from 15-min intervals to continuous micro-metering. Integrate vibration edge-sensor trip threshold at 6.0 mm/s.",
+          root_cause: "Excessive thermal profile in reflow Zone 3 caused by flux accumulation on RTD sensor probes, leading to solder slump and bridging across adjacent BGA balls.",
+          containment_action: "Halt SMT Line 1. Isolate the last 200 boards produced under defect batch for manual visual inspection.",
+          corrective_action: "Recalibrate the reflow oven temperature zones to conform to the updated thermal profile. Clean and align solder paste stencil.",
+          preventive_action: "Implement a daily 15-minute maintenance checklist for the automated optical inspection (AOI) machine to ensure bridging is caught prior to reflow.",
           ai_confidence: 94.8,
           review_status: "PENDING_REVIEW",
           generated_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
@@ -51,8 +51,8 @@ export const CapaReview: React.FC = () => {
           anomaly_id: 2,
           root_cause: "High-pressure polyurethane seal extrusion in the main cylinder port block caused by thermal oil degradation and particulate contamination.",
           containment_action: "Depressurize hydraulic circuit and tag out pump station pending inspection.",
-          corrective_action: "Replace manifold o-rings and cylinder seals with Viton 90 durometer high-temp rings. Filter hydraulic reservoir to ISO 4406 16/14/11 standard.",
-          preventive_action: "Install in-line kidney-loop filtration unit with beta-200 water absorption element. Schedule bi-weekly oil dielectric and particulate spectroscopic sampling.",
+          corrective_action: "Replace manifold o-rings and cylinder seals with Viton 90 durometer high-temp rings. Filter hydraulic reservoir to ISO 4406 standard.",
+          preventive_action: "Install in-line kidney-loop filtration unit with beta-200 water absorption element. Schedule bi-weekly oil spectroscopic sampling.",
           ai_confidence: 91.2,
           review_status: "APPROVED",
           generated_at: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
@@ -80,13 +80,11 @@ export const CapaReview: React.FC = () => {
     fetchCapas();
   }, []);
 
-  // Optimistic UI updates with rollback on failure
   const handleReviewAction = async (capaId: number, newStatus: string) => {
     if (actionLoadingId === capaId) return;
     const previousCapas = [...capas];
     const note = notesState[capaId] || '';
 
-    // Instant visual update
     setCapas((prev) =>
       prev.map((c) =>
         c.id === capaId
@@ -105,7 +103,6 @@ export const CapaReview: React.FC = () => {
       await anomalyApi.updateCapaStatus(capaId, newStatus, note);
       showToast(`CAPA #${capaId} marked as ${newStatus}.`);
     } catch (err: any) {
-      // Revert on failure
       setCapas(previousCapas);
       showToast('Network error: Could not update CAPA status. Reverting change.');
     } finally {
@@ -119,11 +116,11 @@ export const CapaReview: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 p-3.5 rounded-xl bg-orange-500 text-zinc-950 font-bold text-xs shadow-2xl animate-fade-in flex items-center gap-2">
-          <AlertCircle className="w-4 h-4" />
+        <div className="fixed top-4 right-4 z-50 p-3.5 rounded-md bg-slate-900 text-white font-medium text-xs shadow-lg flex items-center gap-2 border border-slate-700 animate-pulse">
+          <AlertCircle className="w-4 h-4 text-slate-300" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -132,15 +129,15 @@ export const CapaReview: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              AI CAPA Review & Manager Approval
+            <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
+              AI CAPA Review & Manager Approvals
             </h1>
-            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/20">
-              Gemini Powered
+            <span className="px-2 py-0.5 rounded text-xs font-mono font-medium bg-slate-100 text-slate-700 border border-slate-200">
+              Gemini 2.5 Flash
             </span>
           </div>
-          <p className="text-zinc-400 text-sm mt-1">
-            Validate 8D root-cause determinations, approve engineering protocols, and export client-side ISO 9001 / OSHA audit reports
+          <p className="text-slate-500 text-sm mt-1">
+            Validate 8D root-cause determinations, approve engineering protocols, and export ISO 9001 / OSHA audit reports
           </p>
         </div>
 
@@ -148,7 +145,7 @@ export const CapaReview: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3.5 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs focus:outline-none focus:border-orange-500"
+            className="px-3.5 py-2 bg-white border border-slate-200 rounded-md text-slate-900 text-xs focus:outline-none focus:border-slate-500 shadow-sm cursor-pointer"
           >
             <option value="ALL">All Review Statuses</option>
             <option value="PENDING_REVIEW">Pending Review</option>
@@ -159,10 +156,10 @@ export const CapaReview: React.FC = () => {
 
           <button
             onClick={fetchCapas}
-            className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-300 text-xs hover:bg-zinc-800 transition"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 rounded-md text-slate-700 text-xs font-medium hover:bg-slate-50 transition-colors duration-150 ease-linear shadow-sm cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            <span>Refresh</span>
           </button>
         </div>
       </div>
@@ -170,40 +167,40 @@ export const CapaReview: React.FC = () => {
       {/* CAPA Action Cards */}
       <div className="space-y-6">
         {filteredCapas.length === 0 ? (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-12 text-center text-zinc-500">
+          <div className="bg-white border border-slate-200 rounded-lg p-12 text-center text-slate-500 shadow-sm">
             No CAPA protocols match the selected criteria.
           </div>
         ) : (
           filteredCapas.map((capa) => (
             <div
               key={capa.id}
-              className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl overflow-hidden"
+              className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden"
             >
               {/* Card Banner */}
-              <div className="px-6 py-4 bg-zinc-950/70 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-gradient-to-tr from-amber-500/20 to-orange-500/20 border border-orange-500/30 text-orange-400">
-                    <Sparkles className="w-5 h-5" />
+                  <div className="p-2 rounded bg-white border border-slate-200 text-slate-700">
+                    <Sparkles className="w-5 h-5 text-slate-700" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-white text-base">CAPA #{capa.id}</span>
-                      <span className="text-zinc-500 text-xs font-mono">
-                        (Ref Anomaly #{capa.anomaly_id})
+                      <span className="font-semibold text-slate-900 text-base">CAPA Record #{capa.id}</span>
+                      <span className="text-slate-500 text-xs font-mono">
+                        (Anomaly #{capa.anomaly_id})
                       </span>
                     </div>
-                    <span className="text-zinc-500 text-[11px]">
+                    <span className="text-slate-400 text-[11px] font-mono">
                       Synthesized: {new Date(capa.generated_at).toLocaleString()}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 sm:gap-3">
-                  {/* Client-Side ISO 9001 / OSHA PDF Export Button */}
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                  {/* ISO 9001 / OSHA PDF Export Button */}
                   <button
                     type="button"
                     onClick={() => exportCapaAuditPdf(capa)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition active:scale-95 shadow-sm"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 text-xs font-medium transition-colors duration-150 ease-linear shadow-xs cursor-pointer"
                     title="Generate client-side ISO 9001 & OSHA 1910 formal audit report PDF"
                   >
                     <FileDown className="w-3.5 h-3.5" />
@@ -211,21 +208,21 @@ export const CapaReview: React.FC = () => {
                   </button>
 
                   {/* Confidence Badge */}
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Confidence: {capa.ai_confidence}%</span>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono">
+                    <ShieldCheck className="w-3.5 h-3.5 text-slate-600" />
+                    <span>AI: {capa.ai_confidence}%</span>
                   </div>
 
                   {/* Status Badge */}
                   <span
-                    className={`text-xs font-bold px-3 py-1 rounded-full ${
+                    className={`text-xs font-semibold px-2.5 py-1 rounded border ${
                       capa.review_status === 'APPROVED'
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        ? 'bg-green-50 text-green-700 border-green-200'
                         : capa.review_status === 'IMPLEMENTED'
-                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                        ? 'bg-slate-100 text-slate-800 border-slate-200'
                         : capa.review_status === 'REJECTED'
-                        ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        ? 'bg-red-50 text-red-700 border-red-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
                     }`}
                   >
                     {capa.review_status.replace('_', ' ')}
@@ -234,46 +231,46 @@ export const CapaReview: React.FC = () => {
               </div>
 
               {/* Card Body: 3 Pillars */}
-              <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 divide-y lg:divide-y-0 lg:divide-x divide-zinc-800">
+              <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* 1. Root Cause */}
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-400">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>1. Root Cause Identification</span>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-900">
+                    <AlertCircle className="w-4 h-4 text-slate-500" />
+                    <span>1. Root Cause Determination</span>
                   </div>
-                  <p className="text-sm text-zinc-300 leading-relaxed bg-zinc-950/60 p-4 rounded-xl border border-zinc-800/80">
+                  <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-md border border-slate-200 min-h-[120px]">
                     {capa.root_cause}
                   </p>
                 </div>
 
                 {/* 2. Corrective Action */}
-                <div className="space-y-2 pt-4 lg:pt-0 lg:pl-6">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-orange-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>2. Immediate Corrective Action</span>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-900">
+                    <CheckCircle2 className="w-4 h-4 text-slate-500" />
+                    <span>2. Corrective Protocol</span>
                   </div>
-                  <p className="text-sm text-zinc-300 leading-relaxed bg-zinc-950/60 p-4 rounded-xl border border-zinc-800/80">
+                  <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-md border border-slate-200 min-h-[120px]">
                     {capa.corrective_action}
                   </p>
                 </div>
 
                 {/* 3. Preventive Action */}
-                <div className="space-y-2 pt-4 lg:pt-0 lg:pl-6">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>3. Long-term Preventive Action</span>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-900">
+                    <ShieldCheck className="w-4 h-4 text-slate-500" />
+                    <span>3. Preventive Safeguard</span>
                   </div>
-                  <p className="text-sm text-zinc-300 leading-relaxed bg-zinc-950/60 p-4 rounded-xl border border-zinc-800/80">
+                  <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-md border border-slate-200 min-h-[120px]">
                     {capa.preventive_action}
                   </p>
                 </div>
               </div>
 
               {/* Reviewer Section */}
-              <div className="px-6 py-4 bg-zinc-950/50 border-t border-zinc-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+              <div className="px-6 py-4 bg-slate-50/70 border-t border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="relative">
-                    <MessageSquare className="absolute left-3.5 top-3 w-4 h-4 text-zinc-500" />
+                    <MessageSquare className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                     <input
                       type="text"
                       placeholder={
@@ -285,7 +282,7 @@ export const CapaReview: React.FC = () => {
                       onChange={(e) =>
                         setNotesState({ ...notesState, [capa.id]: e.target.value })
                       }
-                      className="w-full pl-10 pr-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500"
+                      className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-md text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-500 transition-colors duration-150 ease-linear"
                     />
                   </div>
                 </div>
@@ -295,7 +292,7 @@ export const CapaReview: React.FC = () => {
                   <button
                     disabled={actionLoadingId === capa.id}
                     onClick={() => handleReviewAction(capa.id, 'APPROVED')}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold text-xs transition shadow-md shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-green-700 hover:bg-green-800 text-white font-medium text-xs transition-colors duration-150 ease-linear shadow-xs disabled:opacity-50 cursor-pointer"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     <span>Approve</span>
@@ -303,20 +300,20 @@ export const CapaReview: React.FC = () => {
 
                   <button
                     disabled={actionLoadingId === capa.id}
-                    onClick={() => handleReviewAction(capa.id, 'IMPLEMENTED')}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition active:scale-95 disabled:opacity-50"
+                    onClick={() => handleReviewAction(capa.id, 'REJECTED')}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-white hover:bg-red-50 text-red-700 border border-red-200 font-medium text-xs transition-colors duration-150 ease-linear disabled:opacity-50 cursor-pointer"
                   >
-                    <FileCheck2 className="w-3.5 h-3.5" />
-                    <span>Implemented</span>
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Reject</span>
                   </button>
 
                   <button
                     disabled={actionLoadingId === capa.id}
-                    onClick={() => handleReviewAction(capa.id, 'REJECTED')}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold text-xs transition active:scale-95 disabled:opacity-50"
+                    onClick={() => handleReviewAction(capa.id, 'IMPLEMENTED')}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-slate-800 hover:bg-slate-900 text-white font-medium text-xs transition-colors duration-150 ease-linear shadow-xs disabled:opacity-50 cursor-pointer"
                   >
-                    <XCircle className="w-3.5 h-3.5" />
-                    <span>Reject</span>
+                    <FileCheck2 className="w-3.5 h-3.5" />
+                    <span>Implemented</span>
                   </button>
                 </div>
               </div>
