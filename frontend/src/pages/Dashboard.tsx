@@ -463,7 +463,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
               <span>Refresh</span>
             </button>
             <NavLink
-              to="/anomalies"
+              to="/app/anomalies"
               className="flex items-center gap-1 text-xs font-semibold text-slate-700 hover:text-slate-900 transition-colors duration-150 ease-linear"
             >
               <span>View All</span>
@@ -537,7 +537,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
                   </button>
 
                   <NavLink
-                    to="/capa"
+                    to="/app/capa"
                     className="px-3 py-1.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-medium transition-colors duration-150 ease-linear"
                   >
                     Review

@@ -9,7 +9,8 @@ import {
   Plus, 
   X, 
   Terminal,
-  Cpu
+  Cpu,
+  Globe
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -72,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <NavLink
-              to="/"
+              to="/app"
               onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ease-linear ${
@@ -87,7 +88,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </NavLink>
 
             <NavLink
-              to="/anomalies"
+              to="/"
+              onClick={onClose}
+              className="flex items-center gap-3 px-4 py-2 rounded-md text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors duration-150 ease-linear"
+            >
+              <Globe size={16} className="text-brand-400" />
+              <span>Public Website</span>
+            </NavLink>
+
+            <NavLink
+              to="/app/anomalies"
               onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ease-linear ${
@@ -102,7 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </NavLink>
 
             <NavLink
-              to="/capa"
+              to="/app/capa"
               onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ease-linear ${
@@ -117,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </NavLink>
 
             <NavLink
-              to="/analytics"
+              to="/app/analytics"
               onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ease-linear ${
