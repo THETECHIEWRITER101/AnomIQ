@@ -20,6 +20,7 @@ import LoginModal from '../components/LoginModal';
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
 
@@ -48,25 +49,31 @@ export const LandingPage: React.FC = () => {
               <a href="#pricing" className="text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium">Pricing</a>
             </nav>
 
-            {/* CTA Buttons with Login Option */}
-            <div className="flex items-center gap-2 sm:gap-4">
+            {/* CTA Buttons with Login & Sign Up Options */}
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
-                onClick={() => setIsLoginOpen(true)}
+                onClick={() => {
+                  setAuthInitialMode('login');
+                  setIsLoginOpen(true);
+                }}
                 className="text-slate-600 hover:text-slate-900 transition-colors text-sm font-medium px-3.5 py-2 rounded-full hover:bg-slate-100 cursor-pointer"
               >
                 Log In
               </button>
 
               <button
-                onClick={() => setIsLoginOpen(true)}
-                className="hidden sm:inline-flex items-center justify-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-full text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20 cursor-pointer"
+                onClick={() => {
+                  setAuthInitialMode('signup');
+                  setIsLoginOpen(true);
+                }}
+                className="hidden sm:inline-flex items-center justify-center px-4 py-2 border border-slate-200 text-xs sm:text-sm font-medium rounded-full text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
               >
-                Book Demo
+                Sign Up
               </button>
 
               <button
                 onClick={() => navigate('/app')}
-                className="inline-flex items-center justify-center px-4 py-2 border border-slate-200 text-xs sm:text-sm font-medium rounded-full text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
+                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-xs sm:text-sm font-medium rounded-full text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm shadow-brand-500/20 cursor-pointer"
               >
                 Launch App
               </button>
@@ -74,7 +81,7 @@ export const LandingPage: React.FC = () => {
               {/* Mobile Menu Button */}
               <button 
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2 rounded-md text-slate-400 hover:text-slate-500 hover:bg-slate-100 focus:outline-none"
+                className="md:hidden p-2 rounded-md text-slate-400 hover:text-slate-500 hover:bg-slate-100 focus:outline-none cursor-pointer"
               >
                 {isMobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
               </button>
@@ -146,10 +153,6 @@ export const LandingPage: React.FC = () => {
               
               {/* Hero Content */}
               <div className="lg:col-span-6 flex flex-col justify-center space-y-8">
-                <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-brand-50 border border-brand-100 text-brand-600 text-sm font-medium self-center lg:self-start mb-2">
-                  ✨ New: Collaborative Workspaces & Gemini 2.5 Flash
-                </div>
-
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-slate-900 leading-[1.1]">
                   Empowering your team with <span className="text-brand-500">clear anomaly insights</span>
                 </h1>
@@ -449,6 +452,7 @@ export const LandingPage: React.FC = () => {
       {/* Interactive Login Modal */}
       <LoginModal
         isOpen={isLoginOpen}
+        initialMode={authInitialMode}
         onClose={() => setIsLoginOpen(false)}
       />
 
