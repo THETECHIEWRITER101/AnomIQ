@@ -7,23 +7,25 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./anomiq.db")
 
-# Automatically fix postgres:// scheme if provided by Supabase/Heroku to postgresql+psycopg2://
+# Automatically normalize postgres:// scheme if provided by Supabase/Heroku
 if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
-elif DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgresql+"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 def init_engine():
     global DATABASE_URL
     target_url = DATABASE_URL
     if "sqlite" not in target_url:
         try:
+            connect_args = {}
+            if "localhost" not in target_url and "127.0.0.1" not in target_url:
+                connect_args["sslmode"] = "require"
             test_engine = create_engine(
                 target_url,
                 pool_size=5,
-                max_overflow=0,
+                max_overflow=5,
                 pool_recycle=300,
-                pool_pre_ping=True
+                pool_pre_ping=True,
+                connect_args=connect_args
             )
             with test_engine.connect() as conn:
                 pass

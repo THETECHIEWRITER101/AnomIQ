@@ -82,6 +82,38 @@ def update_capa_review(capa_id: int, payload: schemas.CapaReviewUpdate, db: Sess
     capa.reviewed_at = datetime.datetime.utcnow()
 
     # If approved or implemented, also update parent anomaly status
+    if payload.review_status in ["IMPLEMENTED", "APPROVED"]:
+        anomaly = db.query(models.Anomaly).filter(models.Anomaly.id == capa.anomaly_id).first()
+        if anomaly:
+            anomaly.status = "RESOLVED" if payload.review_status == "IMPLEMENTED" else "CAPA_PENDING"
+            if payload.review_status == "IMPLEMENTED":
+                anomaly.resolved_at = datetime.datetime.utcnow()
+
+    db.commit()
+    db.refresh(capa)
+    return capa
+
+@router.put("/capa/{capa_id}", response_model=schemas.CapaResponse)
+def update_capa_full(capa_id: int, payload: schemas.CapaUpdateRequest, db: Session = Depends(get_db)):
+    """Allow full inline editing of CAPA actions prior to or during engineering review."""
+    capa = db.query(models.CapaAction).filter(models.CapaAction.id == capa_id).first()
+    if not capa:
+        raise HTTPException(status_code=404, detail="CAPA protocol not found")
+
+    if payload.root_cause is not None:
+        capa.root_cause = payload.root_cause
+    if payload.containment_action is not None:
+        capa.containment_action = payload.containment_action
+    if payload.corrective_action is not None:
+        capa.corrective_action = payload.corrective_action
+    if payload.preventive_action is not None:
+        capa.preventive_action = payload.preventive_action
+    if payload.review_status is not None:
+        capa.review_status = payload.review_status
+    if payload.reviewer_notes is not None:
+        capa.reviewer_notes = payload.reviewer_notes
+    capa.reviewed_at = datetime.datetime.utcnow()
+
     if payload.review_status == "IMPLEMENTED":
         anomaly = db.query(models.Anomaly).filter(models.Anomaly.id == capa.anomaly_id).first()
         if anomaly:
@@ -91,6 +123,42 @@ def update_capa_review(capa_id: int, payload: schemas.CapaReviewUpdate, db: Sess
     db.commit()
     db.refresh(capa)
     return capa
+
+@router.post("/5-whys/apply", response_model=schemas.CapaResponse, status_code=status.HTTP_201_CREATED)
+def apply_5_whys_to_capa(payload: schemas.CapaApplyFiveWhysRequest, db: Session = Depends(get_db)):
+    """Directly converts completed 5-Whys diagnostic output into an actionable CAPA record."""
+    anomaly = db.query(models.Anomaly).filter(models.Anomaly.id == payload.anomaly_id).first()
+    if not anomaly:
+        raise HTTPException(status_code=404, detail="Anomaly record not found")
+
+    existing_capa = db.query(models.CapaAction).filter(models.CapaAction.anomaly_id == payload.anomaly_id).first()
+    if existing_capa:
+        existing_capa.root_cause = payload.root_cause
+        if payload.containment_action:
+            existing_capa.containment_action = payload.containment_action
+        existing_capa.corrective_action = payload.corrective_action
+        existing_capa.preventive_action = payload.preventive_action
+        existing_capa.ai_confidence = payload.ai_confidence or 95.0
+        existing_capa.generated_at = datetime.datetime.utcnow()
+        anomaly.status = "CAPA_PENDING"
+        db.commit()
+        db.refresh(existing_capa)
+        return existing_capa
+
+    new_capa = models.CapaAction(
+        anomaly_id=anomaly.id,
+        root_cause=payload.root_cause,
+        containment_action=payload.containment_action or f"Isolate batch and hold {anomaly.machine_id} for maintenance.",
+        corrective_action=payload.corrective_action,
+        preventive_action=payload.preventive_action,
+        ai_confidence=payload.ai_confidence or 95.0,
+        review_status="PENDING_REVIEW"
+    )
+    anomaly.status = "CAPA_PENDING"
+    db.add(new_capa)
+    db.commit()
+    db.refresh(new_capa)
+    return new_capa
 
 
 @router.post("/voice-intake", response_model=schemas.VoiceIntakeResponse)

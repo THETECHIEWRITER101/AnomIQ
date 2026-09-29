@@ -199,4 +199,30 @@ export const anomalyApi = {
     const res = await apiClient.post<FiveWhysStepResponse>('/api/ai/5-whys/step', payload);
     return res.data;
   },
+
+  apply5Whys: async (payload: {
+    anomaly_id: number;
+    root_cause: string;
+    corrective_action: string;
+    preventive_action: string;
+    containment_action?: string;
+  }) => {
+    const res = await apiClient.post<CapaAction>('/api/ai/5-whys/apply', payload);
+    return res.data;
+  },
+
+  updateCapaFull: async (
+    capaId: number,
+    payload: {
+      root_cause?: string;
+      containment_action?: string;
+      corrective_action?: string;
+      preventive_action?: string;
+      review_status?: string;
+      reviewer_notes?: string;
+    }
+  ) => {
+    const res = await apiClient.put<CapaAction>(`/api/ai/capa/${capaId}`, payload);
+    return res.data;
+  },
 };

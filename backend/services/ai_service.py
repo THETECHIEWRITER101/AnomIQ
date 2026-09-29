@@ -110,7 +110,8 @@ class GeminiEngine:
         if not api_key:
             raise ValueError("GEMINI_API_KEY is not defined in environment variables.")
         self.client = genai.Client(api_key=api_key)
-        self.model = "gemini-3.8-flash"
+        # Use active Gemini Flash model with graceful fallbacks
+        self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     def generate_capa(self, title: str, description: str, machine_line: str, severity: str) -> dict:
         """

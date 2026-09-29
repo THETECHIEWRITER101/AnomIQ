@@ -50,6 +50,22 @@ class CapaReviewUpdate(BaseModel):
     review_status: str
     reviewer_notes: Optional[str] = None
 
+class CapaUpdateRequest(BaseModel):
+    root_cause: Optional[str] = None
+    containment_action: Optional[str] = None
+    corrective_action: Optional[str] = None
+    preventive_action: Optional[str] = None
+    review_status: Optional[str] = None
+    reviewer_notes: Optional[str] = None
+
+class CapaApplyFiveWhysRequest(BaseModel):
+    anomaly_id: int
+    root_cause: str
+    corrective_action: str
+    preventive_action: str
+    containment_action: Optional[str] = None
+    ai_confidence: Optional[float] = 95.0
+
 # Metrics & Analytics Schemas
 class DashboardMetricsResponse(BaseModel):
     total_anomalies: int
