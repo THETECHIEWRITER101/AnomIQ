@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Terminal, Copy, Check, RefreshCw, Server, Database } from 'lucide-react';
+import { X, Copy, Check, Server } from 'lucide-react';
 
 interface SupabaseLogsModalProps {
   isOpen: boolean;

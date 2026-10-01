@@ -2,13 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, 
   HelpCircle, 
-  Sparkles, 
   ArrowRight, 
   CheckCircle2, 
   RotateCcw, 
-  Cpu, 
-  AlertCircle,
-  ShieldCheck,
+  ShieldCheck, 
   Zap
 } from 'lucide-react';
 import { Anomaly, anomalyApi, FiveWhysHistoryItem } from '../services/api';
