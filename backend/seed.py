@@ -295,11 +295,40 @@ def seed_database():
         now = datetime.datetime.utcnow()
         inserted_anomalies = []
 
+        # Ensure starter facilities exist
+        fac_apex = db.query(models.Facility).filter(models.Facility.id == "a0000000-0000-0000-0000-000000000001").first()
+        if not fac_apex:
+            fac_apex = models.Facility(
+                id="a0000000-0000-0000-0000-000000000001",
+                name="Apex Robotics Plant 1",
+                code="FAC-APEX-01",
+                industry="AUTOMOTIVE"
+            )
+            db.add(fac_apex)
+            db.commit()
+
+        user_admin = db.query(models.User).filter(
+            (models.User.id == "b0000000-0000-0000-0000-000000000001") | (models.User.email == "sarah.jenkins@anomiq.industrial")
+        ).first()
+        if not user_admin:
+            user_admin = models.User(
+                id="b0000000-0000-0000-0000-000000000001",
+                facility_id="a0000000-0000-0000-0000-000000000001",
+                full_name="Sarah Jenkins",
+                email="sarah.jenkins@anomiq.industrial",
+                role="Facility Admin",
+                active_industry="AUTOMOTIVE"
+            )
+            db.add(user_admin)
+            db.commit()
+
         for row in demo_anomalies:
             detected_time = now - datetime.timedelta(hours=row["hours_ago"])
             anom = models.Anomaly(
+                facility_id="a0000000-0000-0000-0000-000000000001",
                 title=row["title"],
                 machine_id=row["machine_id"],
+                machine_line=row["production_line"],
                 production_line=row["production_line"],
                 severity=row["severity"],
                 status=row["status"],
@@ -308,6 +337,7 @@ def seed_database():
                 metric_value=row["metric_value"],
                 threshold_value=row["threshold_value"],
                 operator_name=row["operator_name"],
+                industry="AUTOMOTIVE",
                 image_url=f"https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800&auto=format&fit=crop&q=75" if row["severity"] in ["CRITICAL", "HIGH"] else None,
                 detected_at=detected_time,
                 resolved_at=now - datetime.timedelta(hours=row["hours_ago"]/2) if row["status"] == "RESOLVED" else None
@@ -318,9 +348,9 @@ def seed_database():
         db.commit()
 
         # Add initial CAPA records for items with CAPA_PENDING status
-        for anom in inserted_anomalies:
+        for idx, anom in enumerate(inserted_anomalies):
             db.refresh(anom)
-            if anom.status in ["CAPA_PENDING", "INVESTIGATING"] and anom.id in [1, 2, 6, 10]:
+            if anom.status in ["CAPA_PENDING", "INVESTIGATING"] and idx in [0, 1, 5, 9]:
                 capa = models.CapaAction(
                     anomaly_id=anom.id,
                     root_cause=f"Primary mechanical degradation in {anom.machine_id}: Excessive fatigue wear on key moving assemblies causing {anom.metric_name} deviation.",
@@ -328,8 +358,8 @@ def seed_database():
                     corrective_action=f"Lockout/Tagout {anom.machine_id}. Replace worn subcomponents, flush lubrication fluid, and recalibrate precision sensors to OEM factory tolerances.",
                     preventive_action=f"Implement high-resolution edge vibration and temperature monitoring with automated early-warning telemetry trips before threshold violation.",
                     ai_confidence=round(random.uniform(91.5, 96.5), 1),
-                    review_status="PENDING_REVIEW" if anom.id != 1 else "APPROVED",
-                    reviewer_notes="Reviewed by Senior Quality Lead. Action item cleared for upcoming scheduled downtime window." if anom.id == 1 else None,
+                    review_status="PENDING_REVIEW" if idx != 0 else "APPROVED",
+                    reviewer_notes="Reviewed by Senior Quality Lead. Action item cleared for upcoming scheduled downtime window." if idx == 0 else None,
                     generated_at=anom.detected_at + datetime.timedelta(minutes=15)
                 )
                 db.add(capa)
