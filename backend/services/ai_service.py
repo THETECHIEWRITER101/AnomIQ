@@ -111,7 +111,7 @@ class GeminiEngine:
             raise ValueError("GEMINI_API_KEY is not defined in environment variables.")
         self.client = genai.Client(api_key=api_key)
         # Use active Gemini Flash model with graceful fallbacks
-        self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
     def generate_capa(self, title: str, description: str, machine_line: str, severity: str) -> dict:
         """
@@ -139,31 +139,36 @@ class GeminiEngine:
         Generate specific, realistic manufacturing actions tailored to this line.
         """
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=CAPAResponseSchema,
-                    temperature=0.1,  # Strict, disciplined industrial responses
-                    max_output_tokens=500  # Enforces brief, punchy manufacturing actions
+        models_to_try = [self.model]
+        last_error = None
+        for mod in models_to_try:
+            try:
+                response = self.client.models.generate_content(
+                    model=mod,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=CAPAResponseSchema,
+                        temperature=0.1,  # Strict, disciplined industrial responses
+                        max_output_tokens=1000  # Generates complete industrial CAPA actions
+                    )
                 )
-            )
-            data = json.loads(response.text)
-            if not data.get("root_cause"):
-                data["root_cause"] = f"Root cause for {title} on {machine_line}: operational deviation under {severity} severity."
-            if "ai_confidence" not in data:
-                data["ai_confidence"] = 93.0
-            
-            _set_cache(cache_key, data)
-            return data
+                data = json.loads(response.text)
+                if not data.get("root_cause"):
+                    data["root_cause"] = f"Root cause for {title} on {machine_line}: operational deviation under {severity} severity."
+                if "ai_confidence" not in data:
+                    data["ai_confidence"] = 93.0
+                
+                _set_cache(cache_key, data)
+                return data
+            except Exception as e:
+                last_error = e
+                continue
 
-        except Exception as e:
-            print(f"[AI ENGINE FALLBACK TRIGGERED] Error: {e}")
-            fallback = self._rule_based_capa(title, description, machine_line, severity)
-            _set_cache(cache_key, fallback)
-            return fallback
+        print(f"[AI ENGINE FALLBACK TRIGGERED] Error: {last_error}")
+        fallback = self._rule_based_capa(title, description, machine_line, severity)
+        _set_cache(cache_key, fallback)
+        return fallback
 
     def parse_voice_intake(self, transcript: str) -> dict:
         """
@@ -190,25 +195,31 @@ class GeminiEngine:
         Classify into: line, component (or machine ID), symptom, suggested_severity (CRITICAL, HIGH, MEDIUM, LOW), metric_name, and metric_value.
         """
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=VoiceDefectSchema,
-                    temperature=0.1,
-                    max_output_tokens=350
+        models_to_try = [self.model]
+        last_error = None
+        for mod in models_to_try:
+            try:
+                response = self.client.models.generate_content(
+                    model=mod,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=VoiceDefectSchema,
+                        temperature=0.1,
+                        max_output_tokens=600
+                    )
                 )
-            )
-            data = json.loads(response.text)
-            _set_cache(cache_key, data)
-            return data
-        except Exception as e:
-            print(f"[VOICE INTAKE FALLBACK] Error: {e}")
-            fallback = self._rule_based_voice(sanitized_transcript)
-            _set_cache(cache_key, fallback)
-            return fallback
+                data = json.loads(response.text)
+                _set_cache(cache_key, data)
+                return data
+            except Exception as e:
+                last_error = e
+                continue
+
+        print(f"[VOICE INTAKE FALLBACK] Error: {last_error}")
+        fallback = self._rule_based_voice(sanitized_transcript)
+        _set_cache(cache_key, fallback)
+        return fallback
 
     def generate_5_whys_step(
         self,
@@ -245,24 +256,30 @@ class GeminiEngine:
         {"Generate step 5 final root-cause conclusion, corrective action, and preventive action." if step >= 5 else f"Ask targeted Why #{step}? Provide exactly 3 short quick-response chips (under 8 words each) that a technician wearing industrial gloves can tap."}
         """
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=FiveWhysStepSchema,
-                    temperature=0.1,
-                    max_output_tokens=500
+        models_to_try = [self.model]
+        last_error = None
+        for mod in models_to_try:
+            try:
+                response = self.client.models.generate_content(
+                    model=mod,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=FiveWhysStepSchema,
+                        temperature=0.1,
+                        max_output_tokens=1000
+                    )
                 )
-            )
-            data = json.loads(response.text)
-            data["current_step"] = step
-            data["is_final_step"] = (step >= 5)
-            return data
-        except Exception as e:
-            print(f"[5-WHYS FALLBACK] Error: {e}")
-            return self._rule_based_5_whys(anomaly_info, step, technician_input)
+                data = json.loads(response.text)
+                data["current_step"] = step
+                data["is_final_step"] = (step >= 5)
+                return data
+            except Exception as e:
+                last_error = e
+                continue
+
+        print(f"[5-WHYS FALLBACK] Error: {last_error}")
+        return self._rule_based_5_whys(anomaly_info, step, technician_input)
 
     def _rule_based_capa(self, title: str, description: str, machine_line: str, severity: str) -> dict:
         title_lower = title.lower()
