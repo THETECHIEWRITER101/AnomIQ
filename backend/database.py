@@ -17,18 +17,22 @@ def init_engine():
     if "sqlite" not in target_url:
         try:
             connect_args = {}
-            if "localhost" not in target_url and "127.0.0.1" not in target_url:
+            # If using Supabase / Remote Postgres without sslmode in URL query, set sslmode to require
+            if "localhost" not in target_url and "127.0.0.1" not in target_url and "sslmode=" not in target_url:
                 connect_args["sslmode"] = "require"
+
+            # Enable prepared statement disable or pooler optimization if pgbouncer is enabled
             test_engine = create_engine(
                 target_url,
-                pool_size=5,
-                max_overflow=5,
+                pool_size=10,
+                max_overflow=10,
                 pool_recycle=300,
                 pool_pre_ping=True,
                 connect_args=connect_args
             )
             with test_engine.connect() as conn:
                 pass
+            print(f"Connected to PostgreSQL database: {target_url.split('@')[-1] if '@' in target_url else 'PostgreSQL'}")
             return test_engine
         except Exception as e:
             print(f"Notice: PostgreSQL connection failed ({e}). Falling back to local SQLite (anomiq.db).")

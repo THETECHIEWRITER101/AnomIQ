@@ -1,22 +1,36 @@
+import os
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 import database
 import models
-from routers import crud_routes, ai_routes
+from routers import crud_routes, ai_routes, notification_routes
 
 # Initialize database schema tables
 try:
     models.Base.metadata.create_all(bind=database.engine)
+    # Perform non-destructive column additions for legacy SQLite/PG schemas
     with database.engine.begin() as conn:
-        try:
-            from sqlalchemy import text
-            conn.execute(text("ALTER TABLE anomalies ADD COLUMN image_url VARCHAR(500)"))
-        except Exception:
-            pass
+        for stmt in [
+            "ALTER TABLE anomalies ADD COLUMN image_url VARCHAR(500)",
+            "ALTER TABLE anomalies ADD COLUMN machine_line VARCHAR(150)",
+            "ALTER TABLE anomalies ADD COLUMN industry VARCHAR(100)",
+            "ALTER TABLE anomalies ADD COLUMN lot_or_batch_number VARCHAR(100)",
+            "ALTER TABLE anomalies ADD COLUMN compliance_standard VARCHAR(100)",
+            "ALTER TABLE anomalies ADD COLUMN reported_by VARCHAR(36)",
+            "ALTER TABLE users ADD COLUMN active_industry VARCHAR(100)",
+            "ALTER TABLE users ADD COLUMN last_login_at TIMESTAMP",
+            "ALTER TABLE users ADD COLUMN updated_at TIMESTAMP",
+            "ALTER TABLE capa_actions ADD COLUMN regulatory_impact TEXT",
+        ]:
+            try:
+                conn.execute(text(stmt))
+            except Exception:
+                pass
 except Exception as e:
-    print(f"Notice: Database schema creation encountered: {e}")
+    print(f"Notice: Database schema initialization encountered: {e}")
 
 app = FastAPI(
     title="AnomIQ - Industrial Anomaly Platform API",
@@ -24,16 +38,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
-import os
-
 # Parse origins from env, defaulting to local development URLs
-raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000")
+raw_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:3000")
 origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=r"https://.*\.vercel\.app",  # Permits every Vercel preview/production branch
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?|https://.*\.vercel\.app",  # Permits all local ports & Vercel
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,6 +54,7 @@ app.add_middleware(
 # Mount API Routers
 app.include_router(crud_routes.router)
 app.include_router(ai_routes.router)
+app.include_router(notification_routes.router)
 
 @app.get("/")
 def root():
