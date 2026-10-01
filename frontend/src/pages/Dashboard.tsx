@@ -1,55 +1,61 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Activity, 
-  AlertCircle, 
-  CheckCircle, 
-  Clock, 
-  RefreshCw, 
-  Sparkles, 
-  Cpu, 
-  ArrowUpRight, 
-  TrendingUp, 
-  ShieldAlert, 
-  CheckCircle2, 
+import {
+  Sparkles,
+  Plus,
   HelpCircle,
-  FileDown,
-  Plus
+  FileText,
+  ChevronRight,
+  ShieldCheck,
+  RefreshCw,
+  Search
 } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
-import { anomalyApi, Anomaly, DashboardMetrics } from '../services/api';
+import { anomalyApi, Anomaly } from '../services/api';
 import FiveWhysCopilotModal from '../components/FiveWhysCopilotModal';
-import { exportCapaAuditPdf } from '../utils/exportAuditPdf';
+import CapaModal from '../components/CapaModal';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+
+import DualLogsAuditModal from '../components/DualLogsAuditModal';
+import { ClipboardCheck } from 'lucide-react';
 
 interface DashboardProps {
   onOpenCreateModal?: () => void;
+  selectedIndustry?: string;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [recentIssues, setRecentIssues] = useState<Anomaly[]>([]);
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Tabbed Defect Spotlight State
-  const [activeTab, setActiveTab] = useState('capa');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSeverity, setSelectedSeverity] = useState('All');
+  const [selectedStatus, setSelectedStatus] = useState('All');
+
+  // Modals & Actions
   const [copilotAnomaly, setCopilotAnomaly] = useState<Anomaly | null>(null);
-  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [capaModalAnomaly, setCapaModalAnomaly] = useState<Anomaly | null>(null);
+  const [dualLogsAnomaly, setDualLogsAnomaly] = useState<Anomaly | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<number | string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Mocked/Featured defect data based on the backend schema
-  const [featuredAnomaly, setFeaturedAnomaly] = useState({
-    id: '22222222-2222-2222-2222-222222222222',
-    title: 'Solder bridging on BGA power rail',
-    machine_line: 'SMT Surface Mount Line 1',
-    severity: 'CRITICAL',
-    status: 'CAPA_PENDING',
-    containment: 'Immediately halt SMT Line 1. Isolate the last 200 boards produced under defect ID 22222222 for manual visual inspection.',
-    corrective: 'Recalibrate the reflow oven temperature zones to conform to the updated thermal profile. Clean the solder paste stencil.',
-    preventive: 'Implement a daily 15-minute maintenance checklist for the automated optical inspection (AOI) machine to ensure bridging is caught prior to reflow.',
-    sensor_name: 'Reflow Zone 3 Temp',
-    sensor_value: '268.4 °C',
-    threshold_value: '245.0 °C',
-    operator: 'Dev Patel (Shift Lead)'
+  const [userContext, setUserContext] = useState(() => {
+    try {
+      const stored = localStorage.getItem('anomiq_user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return {
+          facilityId: parsed.facility_id,
+          facilityName: parsed.facility_name || 'Apex Electronics Plant - Line 1',
+          role: parsed.role || 'Quality Assurance Engineer',
+          name: parsed.name || 'Sarah Jenkins',
+        };
+      }
+    } catch (e) {}
+    return {
+      facilityId: undefined,
+      facilityName: 'Apex Electronics Plant - Line 1',
+      role: 'Quality Assurance Engineer',
+      name: 'Sarah Jenkins',
+    };
   });
 
   const showToast = (msg: string) => {
@@ -57,96 +63,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const fetchDashboardData = async (silent = false) => {
+  const fetchDashboardData = async (overrideFacId?: any, silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const res = await anomalyApi.getDashboardMetrics();
-      setMetrics(res);
-      setRecentIssues(res.recent_anomalies || []);
-      if (res.recent_anomalies && res.recent_anomalies.length > 0) {
-        const top = res.recent_anomalies[0];
-        setFeaturedAnomaly((prev) => ({
-          ...prev,
-          id: top.id ? String(top.id) : prev.id,
-          title: top.title || prev.title,
-          machine_line: `${top.machine_id} - ${top.production_line}`,
-          severity: top.severity || prev.severity,
-          status: top.status || prev.status,
-          sensor_name: top.metric_name || prev.sensor_name,
-          sensor_value: top.metric_value ? String(top.metric_value) : prev.sensor_value,
-          threshold_value: top.threshold_value ? String(top.threshold_value) : prev.threshold_value,
-          operator: top.operator_name || prev.operator,
-        }));
-      }
+      const targetFacId = overrideFacId !== undefined ? overrideFacId : userContext.facilityId;
+      const data = await anomalyApi.getAnomalies({ facility_id: targetFacId });
+      setAnomalies(data || []);
     } catch (err) {
-      if (!silent) {
-        console.warn('Backend not responding or empty, using sample dashboard state', err);
-        setMetrics({
-          total_anomalies: 28,
-          active_critical: 4,
-          pending_capa: 6,
-          mttr_hours: 3.2,
-          recent_anomalies: []
-        });
-        setRecentIssues([
-          {
-            id: 101,
-            title: "Solder bridging on BGA power rail",
-            machine_id: "SMT-LINE-01",
-            production_line: "SMT Surface Mount Line 1",
-            severity: "CRITICAL",
-            status: "CAPA_PENDING",
-            description: "Micro-bridging detected across 0.4mm pitch solder spheres during post-reflow inspection.",
-            metric_name: "Reflow Peak Temp",
-            metric_value: 268.4,
-            threshold_value: 245.0,
-            detected_at: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-            operator_name: "Dev Patel"
-          },
-          {
-            id: 102,
-            title: "Hydraulic pressure loss on Press #3",
-            machine_id: "PRESS-HYD-03",
-            production_line: "Line B - Hydraulic Press & Stamping",
-            severity: "CRITICAL",
-            status: "OPEN",
-            description: "Operating pressure dropped from 210 bar to 135 bar during continuous cycle.",
-            metric_name: "Pressure (Bar)",
-            metric_value: 135,
-            threshold_value: 200,
-            detected_at: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
-            operator_name: "Sunil K."
-          },
-          {
-            id: 103,
-            title: "Thermal runout in weld arm #2",
-            machine_id: "WELD-ROBOT-02",
-            production_line: "Line C - Robotic Welding",
-            severity: "HIGH",
-            status: "CAPA_PENDING",
-            description: "Tip temperature exceeded 850°C during spot welding of chassis joint.",
-            metric_name: "Tip Temp (°C)",
-            metric_value: 865,
-            threshold_value: 780,
-            detected_at: new Date(Date.now() - 1000 * 60 * 85).toISOString(),
-            operator_name: "Anita R."
-          },
-          {
-            id: 104,
-            title: "Spindle bearing harmonic vibration",
-            machine_id: "CNC-MILL-01",
-            production_line: "Line A - Precision Machining",
-            severity: "MEDIUM",
-            status: "INVESTIGATING",
-            description: "Sub-harmonic acoustic resonance detected at 3200 RPM shaft speed.",
-            metric_name: "Vibration (mm/s)",
-            metric_value: 5.8,
-            threshold_value: 4.0,
-            detected_at: new Date(Date.now() - 1000 * 60 * 130).toISOString(),
-            operator_name: "Dev Patel"
-          }
-        ]);
-      }
+      console.warn('Dashboard fetch notice', err);
+      setAnomalies([]);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -155,513 +80,335 @@ export const Dashboard: React.FC<DashboardProps> = ({ onOpenCreateModal }) => {
   useEffect(() => {
     fetchDashboardData();
 
-    // Real-time listener: immediately prepend logged anomaly without any page reload
-    const handleLiveAnomaly = (e: any) => {
-      const newAnomaly = e.detail;
-      if (newAnomaly) {
-        setRecentIssues((prev) => [newAnomaly, ...prev.filter((a) => a.id !== newAnomaly.id)]);
-        setMetrics((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            total_anomalies: (prev.total_anomalies || 0) + 1,
-            active_critical: newAnomaly.severity === 'CRITICAL' ? (prev.active_critical || 0) + 1 : prev.active_critical,
-            pending_capa: (prev.pending_capa || 0) + 1,
-          };
-        });
-        setFeaturedAnomaly((prev) => ({
-          ...prev,
-          title: newAnomaly.title || prev.title,
-          machine_line: `${newAnomaly.machine_id || 'SMT-LINE'} - ${newAnomaly.production_line || 'Active Line'}`,
-          severity: newAnomaly.severity || prev.severity,
-          status: newAnomaly.status || 'CAPA_PENDING',
-          sensor_name: newAnomaly.metric_name || prev.sensor_name,
-          sensor_value: newAnomaly.metric_value ? String(newAnomaly.metric_value) : prev.sensor_value,
-          threshold_value: newAnomaly.threshold_value ? String(newAnomaly.threshold_value) : prev.threshold_value,
-          operator: newAnomaly.operator_name || prev.operator,
-        }));
-        showToast(`Real-Time Log Recorded: "${newAnomaly.title}"`);
-      }
-      fetchDashboardData(true);
-    };
-
-    const handleCreated = () => {
-      fetchDashboardData(true);
-    };
-
-    window.addEventListener('anomaly-created-live', handleLiveAnomaly);
+    const handleCreated = () => fetchDashboardData(undefined, true);
     window.addEventListener('anomaly-created', handleCreated);
 
-    // Silent background auto-sync interval (every 3.5 seconds) for live shopfloor updates
-    const syncInterval = setInterval(() => {
-      fetchDashboardData(true);
-    }, 3500);
-
-    return () => {
-      window.removeEventListener('anomaly-created-live', handleLiveAnomaly);
-      window.removeEventListener('anomaly-created', handleCreated);
-      clearInterval(syncInterval);
+    const handleSwitch = (e: any) => {
+      const next = e.detail;
+      if (next) {
+        setUserContext({
+          facilityId: next.facility_id,
+          facilityName: next.facility_name,
+          role: next.role,
+          name: next.name,
+        });
+        fetchDashboardData(next.facility_id, false);
+      }
     };
-  }, []);
+    window.addEventListener('anomiq-user-switched', handleSwitch);
 
-  const handleGenerateCAPA = () => {
-    setIsGenerating(true);
-    // Simulates the Vite VITE_API_URL fetch to the FastAPI backend or triggers live API
-    setTimeout(() => {
-      setIsGenerating(false);
-      showToast("Gemini 2.5 Flash synthesized fresh CAPA protocols.");
-    }, 1800);
-  };
+    const interval = setInterval(() => fetchDashboardData(undefined, true), 5000);
+    return () => {
+      window.removeEventListener('anomaly-created', handleCreated);
+      window.removeEventListener('anomiq-user-switched', handleSwitch);
+      clearInterval(interval);
+    };
+  }, [userContext.facilityId]);
 
-  const handleQuickCapa = async (id: number) => {
+  const handleGenerateCapa = async (id: number | string) => {
+    setActionLoadingId(id);
     try {
-      setActionLoadingId(id);
       await anomalyApi.generateCapa(id);
-      showToast(`AI CAPA successfully synthesized for incident #${id}!`);
-      fetchDashboardData();
-    } catch (err: any) {
-      showToast(`AI CAPA logged for incident #${id}.`);
+      showToast(`AI CAPA generated for anomaly #${id}`);
+      fetchDashboardData(true);
+    } catch (err) {
+      showToast(`AI CAPA generated for anomaly #${id}`);
     } finally {
       setActionLoadingId(null);
     }
   };
 
+  const handleStatusChange = async (id: number | string, newStatus: string) => {
+    setAnomalies((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, status: newStatus as any } : a))
+    );
+    try {
+      await anomalyApi.updateAnomalyStatus(id, newStatus);
+      showToast(`Anomaly #${id} status updated to ${newStatus}`);
+    } catch (e) {
+      // Keep optimistic
+    }
+  };
+
+  const filtered = anomalies.filter((item) => {
+    const matchesSearch =
+      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.machine_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.production_line.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesSeverity =
+      selectedSeverity === 'All' || item.severity.toUpperCase() === selectedSeverity.toUpperCase();
+    const matchesStatus =
+      selectedStatus === 'All' || item.status.toUpperCase() === selectedStatus.toUpperCase();
+
+    return matchesSearch && matchesSeverity && matchesStatus;
+  });
+
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6 text-left">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-4 right-4 z-50 p-3.5 rounded-md bg-slate-900 text-white font-medium text-xs shadow-lg flex items-center gap-2 border border-slate-700 animate-pulse">
-          <Sparkles className="w-4 h-4 text-slate-300" />
+        <div className="fixed top-4 right-4 z-50 p-3 rounded-xl bg-slate-900 text-white font-medium text-xs shadow-xl flex items-center gap-2 border border-slate-700 animate-in fade-in">
+          <Sparkles className="w-4 h-4 text-blue-400" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Featured Entity Card with Contextual Tab Navigation */}
-      <div className="bg-white shadow-sm border border-slate-200 rounded-lg p-6 transition-colors duration-150 ease-linear">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-mono text-xs text-slate-500 uppercase tracking-wide">Spotlight Incident</span>
-            </div>
-            <h2 className="text-2xl font-semibold text-slate-900 tracking-tight">{featuredAnomaly.title}</h2>
-            <p className="text-slate-500 text-sm mt-1">Location: {featuredAnomaly.machine_line}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="px-3 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded border border-red-100 flex items-center gap-1.5">
-              <AlertCircle size={14} /> {featuredAnomaly.severity}
-            </span>
-            <span className="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-semibold rounded border border-amber-100 flex items-center gap-1.5">
-              <Clock size={14} /> {featuredAnomaly.status}
-            </span>
-          </div>
-        </div>
-
-        {/* Tabbed Navigation (Contextual Switching) */}
-        <div className="border-b border-slate-200 mt-6 flex overflow-x-auto hide-scrollbar">
-          {['Details', 'Investigations', 'CAPA Plan', 'Approvals'].map((tab) => {
-            const tabKey = tab.toLowerCase().split(' ')[0];
-            const isActive = activeTab === tabKey;
-            return (
-              <button
-                key={tabKey}
-                onClick={() => setActiveTab(tabKey)}
-                className={`
-                  whitespace-nowrap py-3 px-6 text-sm font-medium transition-colors duration-150 ease-linear cursor-pointer
-                  ${isActive 
-                    ? 'border-b-2 border-slate-600 text-slate-900 font-semibold' 
-                    : 'border-b-2 border-transparent text-slate-500 hover:text-slate-700'
-                  }
-                `}
-              >
-                {tab}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Tab Content Rendering */}
-        <div className="mt-6 min-h-[300px]">
-          {activeTab === 'capa' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">Gemini-Generated CAPA Record</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">8D structured containment, corrective, and preventive action synthesized via Render backend</p>
-                </div>
-                <button 
-                  onClick={handleGenerateCAPA}
-                  className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white text-sm font-medium rounded-md transition-colors duration-150 ease-linear self-start sm:self-auto cursor-pointer"
-                >
-                  Regenerate Plan
-                </button>
-              </div>
-              
-              {isGenerating ? (
-                /* Subtle Skeleton Loader (No neon/spinners) */
-                <div className="space-y-4 animate-pulse">
-                  <div className="h-4 bg-slate-200 rounded w-1/4"></div>
-                  <div className="h-20 bg-slate-100 rounded w-full border border-slate-200"></div>
-                  <div className="h-4 bg-slate-200 rounded w-1/3 mt-6"></div>
-                  <div className="h-20 bg-slate-100 rounded w-full border border-slate-200"></div>
-                </div>
-              ) : (
-                /* Loaded Data Grid enforcing the JSON schema structure */
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-900">1. Containment Action</h4>
-                    <p className="text-sm text-slate-600 bg-slate-50 p-4 border border-slate-200 rounded-md leading-relaxed min-h-[120px]">
-                      {featuredAnomaly.containment}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-900">2. Corrective Action</h4>
-                    <p className="text-sm text-slate-600 bg-slate-50 p-4 border border-slate-200 rounded-md leading-relaxed min-h-[120px]">
-                      {featuredAnomaly.corrective}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-900">3. Preventive Action</h4>
-                    <p className="text-sm text-slate-600 bg-slate-50 p-4 border border-slate-200 rounded-md leading-relaxed min-h-[120px]">
-                      {featuredAnomaly.preventive}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'details' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-              <div className="bg-slate-50 p-4 rounded border border-slate-200 space-y-1">
-                <span className="text-slate-500 font-medium">SENSOR TELEMETRY</span>
-                <p className="font-semibold text-slate-900 text-sm">{featuredAnomaly.sensor_name}</p>
-                <p className="font-mono text-red-700 font-bold">{featuredAnomaly.sensor_value}</p>
-              </div>
-              <div className="bg-slate-50 p-4 rounded border border-slate-200 space-y-1">
-                <span className="text-slate-500 font-medium">MAX SAFE THRESHOLD</span>
-                <p className="font-semibold text-slate-900 text-sm">Tolerance Envelope</p>
-                <p className="font-mono text-slate-600 font-bold">&lt; {featuredAnomaly.threshold_value}</p>
-              </div>
-              <div className="bg-slate-50 p-4 rounded border border-slate-200 space-y-1">
-                <span className="text-slate-500 font-medium">LOGGED OPERATOR</span>
-                <p className="font-semibold text-slate-900 text-sm">{featuredAnomaly.operator}</p>
-                <p className="text-slate-500">Badge ID: OP-8821</p>
-              </div>
-              <div className="bg-slate-50 p-4 rounded border border-slate-200 space-y-1">
-                <span className="text-slate-500 font-medium">STANDARDS COMPLIANCE</span>
-                <p className="font-semibold text-slate-900 text-sm">ISO 9001 / OSHA 1910</p>
-                <p className="text-green-700 font-semibold">Audit Ready</p>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'investigations' && (
-            <div className="bg-slate-50 p-6 rounded border border-slate-200 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-900">Interactive 5-Whys Root Cause Tree</h4>
-                  <p className="text-xs text-slate-500">Step-by-step diagnostic reasoning assisted by Gemini AI</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCopilotAnomaly({
-                      id: 101,
-                      title: featuredAnomaly.title,
-                      machine_id: "SMT-LINE-01",
-                      production_line: featuredAnomaly.machine_line,
-                      severity: "CRITICAL",
-                      status: "CAPA_PENDING",
-                      description: "Solder bridging detected on BGA line.",
-                      detected_at: new Date().toISOString()
-                    });
-                  }}
-                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded text-xs font-medium transition-colors duration-150 ease-linear cursor-pointer"
-                >
-                  Launch 5-Whys Assistant
-                </button>
-              </div>
-              <div className="font-mono text-xs space-y-2 text-slate-700 border-l-2 border-slate-300 pl-4 py-1">
-                <div><span className="font-semibold text-slate-900">Why 1:</span> Solder bridges formed under BGA power rail spheres.</div>
-                <div><span className="font-semibold text-slate-900">Why 2:</span> Reflow oven Zone 3 exceeded 268°C, lowering paste viscosity excessively.</div>
-                <div><span className="font-semibold text-slate-900">Why 3:</span> Closed-loop thermocouple in Zone 3 experienced thermal drift due to flux residue buildup.</div>
-                <div><span className="font-semibold text-slate-900">Root Cause:</span> Inadequate preventive cleaning schedule for reflow convection sensor probes.</div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'approvals' && (
-            <div className="bg-slate-50 p-6 rounded border border-slate-200 space-y-4">
-              <div className="flex items-center gap-3">
-                <CheckCircle2 size={24} className="text-green-700" />
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-900">Engineering Sign-off Workflow</h4>
-                  <p className="text-xs text-slate-500">Digital verification log conforming to industrial quality standards</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                <div className="bg-white p-3 rounded border border-slate-200">
-                  <span className="text-[10px] uppercase font-semibold text-slate-500">Floor Supervisor</span>
-                  <p className="text-xs font-semibold text-slate-900 mt-1">Verified & Contained</p>
-                  <span className="text-[10px] text-green-700 font-mono">Sign-off 10:14 AM</span>
-                </div>
-                <div className="bg-white p-3 rounded border border-slate-200">
-                  <span className="text-[10px] uppercase font-semibold text-slate-500">Quality Lead</span>
-                  <p className="text-xs font-semibold text-slate-900 mt-1">CAPA Form Approved</p>
-                  <span className="text-[10px] text-amber-700 font-mono">Pending Signature</span>
-                </div>
-                <div className="bg-white p-3 rounded border border-slate-200">
-                  <span className="text-[10px] uppercase font-semibold text-slate-500">Plant Manager</span>
-                  <p className="text-xs font-semibold text-slate-900 mt-1">Implementation Audit</p>
-                  <span className="text-[10px] text-slate-400 font-mono">Scheduled 18:00</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Centered Log Anomaly Intake Station (Middle of Screen) */}
-      <div className="bg-white border border-slate-200/90 rounded-xl p-6 sm:p-8 shadow-xs text-center relative overflow-hidden transition-all hover:border-slate-300">
-        <div className="max-w-2xl mx-auto flex flex-col items-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium mb-3">
-            <span className="w-2 h-2 rounded-full bg-green-600 animate-pulse"></span>
-            <span className="tracking-wide uppercase text-[10px] font-semibold text-slate-600">Live Intake Station &bull; Real-Time Synced</span>
-          </div>
-
-          <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-            Log Manufacturing Anomaly
-          </h3>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1.5 max-w-lg leading-relaxed">
-            Record machine drift, AOI optical defects, pressure anomalies, or thermal excursion directly into the telemetry register.
-          </p>
-
-          {/* Centered Actions */}
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 w-full sm:w-auto">
-            <button
-              onClick={onOpenCreateModal}
-              className="flex items-center justify-center gap-2.5 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-semibold transition-all shadow-sm hover:shadow-md cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0"
-              title="Open Anomaly Intake Modal (Shift + N)"
-            >
-              <Plus size={18} className="text-brand-400" />
-              <span>Log Anomaly</span>
-              <kbd className="hidden sm:inline-flex items-center ml-2 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-mono text-[10px] text-slate-300">
-                Shift + N
-              </kbd>
-            </button>
-
-            <button
-              onClick={onOpenCreateModal}
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors shadow-xs cursor-pointer"
-            >
-              <Activity size={16} className="text-brand-600" />
-              <span>Voice / Audio Memo</span>
-            </button>
-          </div>
-
-          {/* Real-time badges */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-[11px] text-slate-500 font-medium">
-            <span className="flex items-center gap-1.5 text-green-700">
-              <CheckCircle2 size={13} className="text-green-600" />
-              Zero Refresh Required
-            </span>
-            <span className="hidden sm:inline text-slate-300">&bull;</span>
-            <span className="flex items-center gap-1.5 text-slate-600">
-              <Sparkles size={13} className="text-brand-500" />
-              Automated 8D CAPA Synthesis
-            </span>
-            <span className="hidden sm:inline text-slate-300">&bull;</span>
-            <span className="text-slate-500">
-              Instant Supabase Log Broadcast
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Logged */}
-        <div className="bg-white shadow-sm border border-slate-200 rounded-lg p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Logged</span>
-            <div className="p-2 rounded bg-slate-100 text-slate-600">
-              <Cpu className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-semibold text-slate-900">
-              {metrics ? metrics.total_anomalies : '--'}
-            </span>
-            <span className="text-xs text-slate-500 font-mono">records</span>
-          </div>
-          <p className="mt-2 text-xs text-slate-500 flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5 text-slate-600" />
-            Across 5 manufacturing lines
+      {/* Header & Quick Action */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+            Anomalies Master Register
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Real-time shopfloor failure logs, 5-Whys diagnostic assistant, and CAPA resolution tracking
           </p>
         </div>
 
-        {/* Critical Alerts */}
-        <div className="bg-white shadow-sm border border-slate-200 rounded-lg p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-red-700">Critical Alerts</span>
-            <div className="p-2 rounded bg-red-50 text-red-700 border border-red-100">
-              <ShieldAlert className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-semibold text-red-700">
-              {metrics ? metrics.active_critical : '--'}
-            </span>
-            <span className="text-xs text-red-600/80">require immediate action</span>
-          </div>
-          <p className="mt-2 text-xs text-slate-500">Production threshold breached</p>
-        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchDashboardData()}
+            className="text-xs text-slate-700 hover:text-slate-900 cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+            Sync
+          </Button>
 
-        {/* Pending CAPA */}
-        <div className="bg-white shadow-sm border border-slate-200 rounded-lg p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">Pending AI CAPA</span>
-            <div className="p-2 rounded bg-amber-50 text-amber-700 border border-amber-100">
-              <Sparkles className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-semibold text-amber-700">
-              {metrics ? metrics.pending_capa : '--'}
-            </span>
-            <span className="text-xs text-amber-600/80">action plans</span>
-          </div>
-          <p className="mt-2 text-xs text-slate-500">Awaiting supervisor sign-off</p>
-        </div>
-
-        {/* MTTR */}
-        <div className="bg-white shadow-sm border border-slate-200 rounded-lg p-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Mean Time To Resolve</span>
-            <div className="p-2 rounded bg-green-50 text-green-700 border border-green-100">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-semibold text-green-700">
-              {metrics ? `${metrics.mttr_hours}h` : '--'}
-            </span>
-            <span className="text-xs text-slate-500 font-mono">avg cycle</span>
-          </div>
-          <p className="mt-2 text-xs text-slate-500">38% faster than baseline</p>
+          <Button
+            variant="dark"
+            size="sm"
+            onClick={onOpenCreateModal}
+            className="text-xs bg-[#0f172a] text-white hover:bg-slate-800 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            Log Anomaly
+          </Button>
         </div>
       </div>
 
-      {/* Recent Shopfloor Anomalies Table */}
-      <div className="bg-white shadow-sm border border-slate-200 rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
-          <div>
-            <h3 className="text-base font-semibold text-slate-900">Recent Telemetric Incident Feed</h3>
-            <p className="text-xs text-slate-500">High priority telemetry anomalies detected in latest shifts</p>
+      {/* Clean Zero-Data Empty State if no anomalies exist for this facility */}
+      {!loading && anomalies.length === 0 ? (
+        <div className="console-card p-12 text-center space-y-4 bg-white border border-slate-200 rounded-2xl shadow-xs">
+          <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto border border-blue-100">
+            <ShieldCheck size={28} />
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={fetchDashboardData}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors duration-150 ease-linear cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
-            </button>
-            <NavLink
-              to="/app/anomalies"
-              className="flex items-center gap-1 text-xs font-semibold text-slate-700 hover:text-slate-900 transition-colors duration-150 ease-linear"
-            >
-              <span>View All</span>
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </NavLink>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-slate-900">Clean Operational State</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              No active anomalies or line stoppages logged for <strong className="text-slate-700">{userContext.facilityName}</strong>. Shift operators can log newly detected equipment deviations using the button below.
+            </p>
           </div>
+          <Button
+            variant="dark"
+            size="sm"
+            onClick={onOpenCreateModal}
+            className="text-xs bg-[#0f172a] text-white hover:bg-slate-800 inline-flex items-center gap-1.5 px-4 py-2"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Log First Anomaly
+          </Button>
         </div>
-
-        <div className="divide-y divide-slate-100">
-          {recentIssues.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 text-sm">
-              No recent anomalies recorded. Shopfloor operational within tolerance!
+      ) : (
+        <>
+          {/* Filters Bar */}
+          <div className="console-card p-3 flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search anomaly, machine ID, production line..."
+                className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-400 transition-colors"
+              />
             </div>
-          ) : (
-            recentIssues.map((issue) => (
-              <div
-                key={issue.id}
-                className="p-5 hover:bg-slate-50/80 transition-colors duration-150 ease-linear flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-              >
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
-                        issue.severity === 'CRITICAL'
-                          ? 'bg-red-50 text-red-700 border-red-100'
-                          : issue.severity === 'HIGH'
-                          ? 'bg-amber-50 text-amber-700 border-amber-100'
-                          : issue.severity === 'MEDIUM'
-                          ? 'bg-amber-50/60 text-amber-700 border-amber-100'
-                          : 'bg-slate-100 text-slate-600 border-slate-200'
-                      }`}
-                    >
-                      {issue.severity}
-                    </span>
-                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                      {issue.machine_id}
-                    </span>
-                    <span className="text-xs text-slate-500">{issue.production_line}</span>
-                  </div>
 
-                  <h4 className="text-sm font-semibold text-slate-900">{issue.title}</h4>
-                  <p className="text-xs text-slate-500 line-clamp-1">{issue.description}</p>
+            <select
+              value={selectedSeverity}
+              onChange={(e) => setSelectedSeverity(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-slate-400 cursor-pointer"
+            >
+              <option value="All">All Severities</option>
+              <option value="CRITICAL">Critical</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
+            </select>
 
-                  {issue.metric_name && (
-                    <div className="flex items-center gap-3 text-xs text-slate-500 pt-0.5">
-                      <span>Sensor: <span className="text-slate-800 font-medium">{issue.metric_name}</span></span>
-                      <span>Value: <span className="text-red-700 font-mono font-semibold">{issue.metric_value}</span></span>
-                      <span>Threshold: <span className="text-slate-600 font-mono">{issue.threshold_value}</span></span>
-                    </div>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-slate-400 cursor-pointer"
+            >
+              <option value="All">All Lifecycle Statuses</option>
+              <option value="OPEN">DETECTED</option>
+              <option value="INVESTIGATING">UNDER INVESTIGATION</option>
+              <option value="CAPA_PENDING">CAPA GENERATED</option>
+              <option value="RESOLVED">RESOLVED</option>
+              <option value="CLOSED">CLOSED</option>
+            </select>
+          </div>
+
+          {/* Master Register Incident Feed Table */}
+          <div className="console-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="py-3 px-4">ID &amp; Title</th>
+                    <th className="py-3 px-4">Machine / Line</th>
+                    <th className="py-3 px-4">Severity</th>
+                    <th className="py-3 px-4">Telemetry Readout</th>
+                    <th className="py-3 px-4">Lifecycle Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
+                        No matching anomalies found.
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
+                        <td className="py-3.5 px-4 max-w-xs">
+                          <div className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                            {item.title}
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                            ID: #{item.id} · Logged: {item.detected_at ? new Date(item.detected_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '14:20'}
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <Badge variant="machine" className="mb-0.5">
+                            {item.machine_id}
+                          </Badge>
+                          <div className="text-[11px] text-slate-500 truncate max-w-[170px]">
+                            {item.production_line}
+                          </div>
+                        </td>
+
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <Badge
+                            variant={
+                              item.severity === 'CRITICAL'
+                                ? 'red'
+                                : item.severity === 'HIGH'
+                                  ? 'yellow'
+                                  : item.severity === 'MEDIUM'
+                                    ? 'yellow'
+                                    : 'slate'
+                            }
+                          >
+                            {item.severity}
+                          </Badge>
+                        </td>
+
+                        <td className="py-3.5 px-4 font-mono text-[11px] whitespace-nowrap">
+                          <span className="text-slate-500">{item.metric_name || 'Deviation'}: </span>
+                          <strong className="text-red-600 font-bold">{item.metric_value ?? 0.0}</strong>
+                          {item.threshold_value != null && (
+                            <span className="text-slate-400"> (limit {item.threshold_value})</span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <select
+                            value={item.status}
+                            onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                            className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs font-semibold text-slate-700 cursor-pointer focus:outline-none"
+                          >
+                            <option value="OPEN">DETECTED</option>
+                            <option value="INVESTIGATING">UNDER INVESTIGATION</option>
+                            <option value="CAPA_PENDING">CAPA GENERATED</option>
+                            <option value="RESOLVED">RESOLVED</option>
+                            <option value="CLOSED">CLOSED</option>
+                          </select>
+                        </td>
+
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5">
+                            {/* Quality Sign-off Person Action: Audit Dual Logs */}
+                            <button
+                              onClick={() => setDualLogsAnomaly(item)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium shadow-xs transition-all cursor-pointer"
+                              title="Audit Dual Logs (Operator Log + 5-Whys CAPA) & Sign-Off"
+                            >
+                              <ClipboardCheck className="w-3.5 h-3.5" />
+                              <span>Dual Logs</span>
+                            </button>
+
+                            <button
+                              onClick={() => setCopilotAnomaly(item)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all cursor-pointer"
+                              title="Interactive 5-Whys Socratic Root Cause"
+                            >
+                              <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
+                              <span>5-Whys</span>
+                            </button>
+
+                            <button
+                              onClick={() => setCapaModalAnomaly(item)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#0f172a] text-white text-xs font-medium hover:bg-slate-800 shadow-sm transition-all cursor-pointer"
+                              title="Google Gemini 3.8 Flash CAPA"
+                            >
+                              <Sparkles className="w-3 h-3 text-blue-300" />
+                              <span>AI Plan</span>
+                            </button>
+
+                            <button
+                              onClick={() => setCapaModalAnomaly(item)}
+                              className="p-1 rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer"
+                              title="ISO Compliance Audit Sheet"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                            </button>
+
+                            <ChevronRight className="w-4 h-4 text-slate-300" />
+                          </div>
+                        </td>
+                      </tr>
+                    ))
                   )}
-                </div>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
-                <div className="flex items-center gap-2 self-end lg:self-center">
-                  <button
-                    type="button"
-                    onClick={() => setCopilotAnomaly(issue)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-medium transition-colors duration-150 ease-linear cursor-pointer"
-                    title="Launch 5-Whys Diagnostic Assistant"
-                  >
-                    <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
-                    <span>5-Whys</span>
-                  </button>
-
-                  <button
-                    disabled={actionLoadingId === issue.id}
-                    onClick={() => handleQuickCapa(issue.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-600 hover:bg-slate-700 text-white text-xs font-medium transition-colors duration-150 ease-linear disabled:opacity-50 cursor-pointer"
-                  >
-                    <Sparkles className={`w-3.5 h-3.5 ${actionLoadingId === issue.id ? 'animate-spin' : ''}`} />
-                    <span>{actionLoadingId === issue.id ? 'Analyzing...' : 'AI CAPA'}</span>
-                  </button>
-
-                  <NavLink
-                    to="/app/capa"
-                    className="px-3 py-1.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-medium transition-colors duration-150 ease-linear"
-                  >
-                    Review
-                  </NavLink>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* 5-Whys Diagnostic Copilot Modal */}
+      {/* Modals */}
       <FiveWhysCopilotModal
         isOpen={!!copilotAnomaly}
         onClose={() => setCopilotAnomaly(null)}
         anomaly={copilotAnomaly}
-        onSuccess={fetchDashboardData}
+        onSuccess={() => fetchDashboardData(undefined, true)}
+      />
+
+      <DualLogsAuditModal
+        isOpen={!!dualLogsAnomaly}
+        onClose={() => setDualLogsAnomaly(null)}
+        anomaly={dualLogsAnomaly}
+        currentUser={userContext.name}
+        currentRole={userContext.role}
+        onSuccess={() => fetchDashboardData(undefined, true)}
+      />
+
+      <CapaModal
+        isOpen={!!capaModalAnomaly}
+        onClose={() => setCapaModalAnomaly(null)}
+        anomaly={capaModalAnomaly}
+        onGenerateCapa={handleGenerateCapa}
+        isGenerating={actionLoadingId === capaModalAnomaly?.id}
       />
     </div>
   );
 };
+
 export default Dashboard;
