@@ -182,7 +182,20 @@ export const CreateAnomalyModal: React.FC<CreateAnomalyModalProps> = ({
     try {
       setIsSubmitting(true);
       setError(null);
-      const created = await anomalyApi.createAnomaly(formData);
+
+      let facilityId = undefined;
+      try {
+        const stored = localStorage.getItem('anomiq_user');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          facilityId = parsed.facility_id;
+        }
+      } catch (err) {}
+
+      const created = await anomalyApi.createAnomaly({
+        ...formData,
+        facility_id: facilityId,
+      });
       window.dispatchEvent(new CustomEvent('anomaly-created-live', { detail: created }));
       window.dispatchEvent(new Event('anomaly-created'));
       onSuccess();

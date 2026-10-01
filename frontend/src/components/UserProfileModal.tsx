@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Copy, 
@@ -7,14 +7,11 @@ import {
   Building, 
   Clock, 
   ShieldCheck, 
-  AlertCircle, 
   History, 
   LogOut, 
-  Cpu, 
-  Sparkles,
-  CheckCircle2,
-  Calendar
+  Sparkles
 } from 'lucide-react';
+import { anomalyApi, Anomaly } from '../services/api';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -28,19 +25,20 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onLogout,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [userAnomalies, setUserAnomalies] = useState<Anomaly[]>([]);
+  const [loadingAnomalies, setLoadingAnomalies] = useState(false);
 
-  if (!isOpen) return null;
-
-  // Retrieve user from storage or default
+  // Retrieve user from local storage
   let user = {
-    name: 'Dev Patel',
-    role: 'Reliability Engineer (Line A)',
-    email: 'dev.patel@anomiq.industrial',
-    initials: 'DP',
-    department: 'Precision Machining & SMT Surface Mount Line 1',
-    division: 'Advanced Electronics & Stamping Facility',
-    badgeId: 'EMP-ANOM-8821',
-    shift: 'Shift A (06:00 - 14:30 IST)',
+    id: 'user-001',
+    name: 'Operator User',
+    role: 'Quality Engineer',
+    email: 'user@facility.com',
+    initials: 'OU',
+    facility_name: 'Industrial Facility Workspace',
+    facility_id: undefined as any,
+    badgeId: 'EMP-ANOM-1001',
+    shift: 'General Shift (Active)',
     uuid: '018f3a9b-7c2e-7110-82a1-94821a8b9e02',
   };
 
@@ -51,68 +49,40 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       user.name = parsed.name || user.name;
       user.role = parsed.role || user.role;
       user.email = parsed.email || user.email;
+      user.facility_name = parsed.facility_name || user.facility_name;
+      user.facility_id = parsed.facility_id;
+      user.id = parsed.id ? String(parsed.id) : user.id;
+      user.uuid = parsed.id ? `usr-${parsed.id}` : user.uuid;
+      user.badgeId = `EMP-${(parsed.name || 'USER').split(' ').map((n: string) => n[0]).join('').toUpperCase()}-${parsed.id || '01'}`;
       user.initials = user.name
         .split(' ')
         .map((p: string) => p[0])
         .join('')
         .slice(0, 2)
         .toUpperCase();
-      if (parsed.name.includes('Sarah')) {
-        user.department = 'SMT Surface Mount Quality Engineering';
-        user.badgeId = 'EMP-ANOM-9042';
-        user.uuid = '018f4c12-3b8a-7221-99c0-11234a9b5f88';
-      } else if (parsed.name.includes('Anita')) {
-        user.department = 'Robotic Welding & Assembly Automation';
-        user.badgeId = 'EMP-ANOM-7419';
-        user.uuid = '018f5e77-9a4d-7334-aa10-44910b8c2d11';
-      }
     }
-  } catch (e) {
-    // fallback
-  }
+  } catch (e) {}
 
-  const logHistory = [
-    {
-      id: 'ANM-2026-01',
-      title: 'Solder bridging on BGA power rail',
-      machine: 'SMT-LINE-01',
-      line: 'SMT Surface Mount Line 1',
-      severity: 'CRITICAL',
-      status: 'CAPA_PENDING',
-      date: 'Today, 10:14 AM',
-      note: 'Thermal drift observed in Reflow Zone 3. Automated CAPA generated.',
-    },
-    {
-      id: 'ANM-2026-02',
-      title: 'Spindle bearing harmonic vibration',
-      machine: 'CNC-MILL-01',
-      line: 'Line A - Precision Machining',
-      severity: 'MEDIUM',
-      status: 'INVESTIGATING',
-      date: 'Yesterday, 14:20 PM',
-      note: 'Acoustic vibration spike at 3200 RPM shaft speed.',
-    },
-    {
-      id: 'ANM-2026-03',
-      title: 'Hydraulic pressure loss on Press #3',
-      machine: 'PRESS-HYD-03',
-      line: 'Line B - Hydraulic Press & Stamping',
-      severity: 'CRITICAL',
-      status: 'RESOLVED',
-      date: 'Sep 26, 2026',
-      note: 'Seal ring replacement verified. Pressure stable at 210 bar.',
-    },
-    {
-      id: 'ANM-2026-04',
-      title: 'Robotic arm weld temperature excursion',
-      machine: 'WELD-ROBOT-02',
-      line: 'Line C - Robotic Welding',
-      severity: 'HIGH',
-      status: 'CLOSED',
-      date: 'Sep 24, 2026',
-      note: 'Electrode holder acid flushed and chiller flow interlock commissioned.',
-    },
-  ];
+  useEffect(() => {
+    if (isOpen) {
+      setLoadingAnomalies(true);
+      anomalyApi.getAnomalies({ facility_id: user.facility_id })
+        .then((data) => {
+          setUserAnomalies(data || []);
+        })
+        .catch(() => {
+          setUserAnomalies([]);
+        })
+        .finally(() => {
+          setLoadingAnomalies(false);
+        });
+    }
+  }, [isOpen, user.facility_id]);
+
+  if (!isOpen) return null;
+
+  const totalLogs = userAnomalies.length;
+  const capasSynthesized = userAnomalies.filter(a => a.capas && a.capas.length > 0).length;
 
   const handleCopyUUID = () => {
     navigator.clipboard.writeText(user.uuid);
@@ -153,7 +123,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-0.5">
-                Operator System UUID (Supabase Account ID)
+                Operator System ID (Account)
               </span>
               <p className="font-mono text-xs text-slate-900 font-medium break-all">
                 {user.uuid}
@@ -164,7 +134,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium rounded-lg transition-colors shadow-xs shrink-0 self-start sm:self-auto cursor-pointer"
             >
               {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
-              <span>{copied ? 'Copied' : 'Copy UUID'}</span>
+              <span>{copied ? 'Copied' : 'Copy ID'}</span>
             </button>
           </div>
 
@@ -173,10 +143,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1">
               <div className="flex items-center gap-1.5 text-slate-400 font-medium">
                 <Building size={14} />
-                <span className="uppercase text-[10px] tracking-wider">Department & Line</span>
+                <span className="uppercase text-[10px] tracking-wider">Facility & Workspace</span>
               </div>
-              <p className="text-slate-900 font-semibold text-xs leading-snug">{user.department}</p>
-              <p className="text-slate-500 text-[11px]">{user.division}</p>
+              <p className="text-slate-900 font-semibold text-xs leading-snug">{user.facility_name}</p>
+              <p className="text-slate-500 text-[11px]">Industrial Operations Console</p>
             </div>
 
             <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1">
@@ -197,7 +167,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <span className="uppercase text-[10px] tracking-wider">Official Email</span>
               </div>
               <p className="text-slate-900 font-semibold text-xs font-mono">{user.email}</p>
-              <p className="text-slate-500 text-[11px]">Corporate SSO Linked</p>
+              <p className="text-slate-500 text-[11px]">Registered Workspace User</p>
             </div>
 
             <div className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1">
@@ -205,80 +175,91 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <ShieldCheck size={14} />
                 <span className="uppercase text-[10px] tracking-wider">Access Clearance</span>
               </div>
-              <p className="text-slate-900 font-semibold text-xs">Level 3 Quality Lead</p>
-              <p className="text-slate-500 text-[11px]">ISO 9001 Audit & CAPA Signoff</p>
+              <p className="text-slate-900 font-semibold text-xs">{user.role}</p>
+              <p className="text-slate-500 text-[11px]">Facility Inspection & Signoff</p>
             </div>
           </div>
 
           {/* Quick Performance Summary */}
-          <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-center">
+          <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-center">
             <div>
-              <p className="text-lg font-bold text-slate-900">14</p>
+              <p className="text-lg font-bold text-slate-900">{totalLogs}</p>
               <span className="text-[10px] uppercase font-semibold text-slate-500">Logs Reported</span>
             </div>
             <div>
-              <p className="text-lg font-bold text-slate-900">12</p>
+              <p className="text-lg font-bold text-slate-900">{capasSynthesized}</p>
               <span className="text-[10px] uppercase font-semibold text-slate-500">CAPAs Synthesized</span>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-green-700">99.2%</p>
-              <span className="text-[10px] uppercase font-semibold text-slate-500">Quality Score</span>
             </div>
           </div>
 
-          {/* History of Logged Anomalies / Post History */}
+          {/* History of Logged Anomalies */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-900 uppercase tracking-wider">
                 <History size={15} className="text-slate-500" />
-                <span>Operator Anomaly Logging History & Posts</span>
+                <span>Operator Anomaly Logging History</span>
               </div>
-              <span className="text-[11px] text-slate-400 font-mono">Last 7 Days</span>
+              {loadingAnomalies && (
+                <span className="text-xs text-slate-400 flex items-center gap-1">
+                  <Sparkles size={12} className="animate-spin" /> Loading logs...
+                </span>
+              )}
             </div>
 
-            <div className="space-y-2">
-              {logHistory.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3.5 rounded-xl bg-white border border-slate-200 hover:border-slate-300 transition-all text-xs space-y-1.5 shadow-xs"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[11px] font-semibold text-slate-500">
-                        {item.id}
-                      </span>
-                      <h4 className="font-semibold text-slate-900">{item.title}</h4>
+            {userAnomalies.length > 0 ? (
+              <div className="space-y-2">
+                {userAnomalies.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-3.5 rounded-xl bg-white border border-slate-200 hover:border-slate-300 transition-all text-xs space-y-1.5 shadow-xs"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[11px] font-semibold text-slate-500">
+                          #{item.id}
+                        </span>
+                        <h4 className="font-semibold text-slate-900">{item.title}</h4>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[9px] font-semibold border ${
+                            item.severity === 'CRITICAL'
+                              ? 'bg-red-50 text-red-700 border-red-100'
+                              : item.severity === 'HIGH'
+                              ? 'bg-amber-50 text-amber-700 border-amber-100'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {item.severity}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {item.detected_at ? new Date(item.detected_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Logged'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[9px] font-semibold border ${
-                          item.severity === 'CRITICAL'
-                            ? 'bg-red-50 text-red-700 border-red-100'
-                            : item.severity === 'HIGH'
-                            ? 'bg-amber-50 text-amber-700 border-amber-100'
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        {item.severity}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">{item.date}</span>
+
+                    <p className="text-slate-600 text-[11px] font-light leading-relaxed">
+                      {item.description}
+                    </p>
+
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono pt-0.5">
+                      <span>Machine: {item.machine_id}</span>
+                      <span>&bull;</span>
+                      <span>{item.production_line}</span>
+                      <span>&bull;</span>
+                      <span className="text-brand-600 font-semibold">{item.status}</span>
                     </div>
                   </div>
-
-                  <p className="text-slate-600 text-[11px] font-light leading-relaxed">
-                    {item.note}
-                  </p>
-
-                  <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono pt-0.5">
-                    <span>Machine: {item.machine}</span>
-                    <span>&bull;</span>
-                    <span>{item.line}</span>
-                    <span>&bull;</span>
-                    <span className="text-brand-600 font-semibold">{item.status}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                <p className="text-xs font-medium text-slate-600">No anomaly logs recorded yet</p>
+                <p className="text-[11px] text-slate-400 mt-0.5 font-light">
+                  Log your first manufacturing defect on the shopfloor to build your incident history.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -307,3 +288,4 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   );
 };
 export default UserProfileModal;
+
