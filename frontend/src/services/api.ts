@@ -10,9 +10,11 @@ export const apiClient = axios.create({
 });
 
 export interface Anomaly {
-  id: number;
+  id: number | string;
+  facility_id?: number | string;
   title: string;
   machine_id: string;
+  machine_line?: string;
   production_line: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   status: 'OPEN' | 'INVESTIGATING' | 'CAPA_PENDING' | 'RESOLVED' | 'CLOSED';
@@ -21,19 +23,25 @@ export interface Anomaly {
   metric_value?: number;
   threshold_value?: number;
   detected_at: string;
+  resolved_at?: string;
   operator_name?: string;
   image_url?: string;
+  industry?: string;
+  lot_or_batch_number?: string;
+  compliance_standard?: string;
+  industry_data?: any;
   capa?: CapaAction;
   capas?: CapaAction[];
 }
 
 export interface CapaAction {
-  id: number;
-  anomaly_id: number;
+  id: number | string;
+  anomaly_id: number | string;
   root_cause: string;
   containment_action?: string;
   corrective_action: string;
   preventive_action: string;
+  regulatory_impact?: string;
   ai_confidence: number;
   review_status: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'IMPLEMENTED';
   reviewer_notes?: string;
@@ -50,6 +58,7 @@ export interface DashboardMetrics {
 }
 
 export interface CreateAnomalyPayload {
+  facility_id?: number | string;
   title: string;
   machine_id: string;
   production_line: string;
@@ -63,7 +72,7 @@ export interface CreateAnomalyPayload {
 }
 
 export interface DuplicateMatch {
-  id: number;
+  id: number | string;
   title: string;
   machine_id: string;
   production_line: string;
@@ -96,7 +105,7 @@ export interface FiveWhysHistoryItem {
 }
 
 export interface FiveWhysStepPayload {
-  anomaly_id?: number;
+  anomaly_id?: number | string;
   anomaly_title?: string;
   machine_id?: string;
   production_line?: string;
@@ -120,17 +129,17 @@ export interface FiveWhysStepResponse {
 
 export const anomalyApi = {
   // Anomaly CRUD
-  getAnomalies: async (params?: { severity?: string; status?: string; line?: string }) => {
+  getAnomalies: async (params?: { facility_id?: number | string; severity?: string; status?: string; line?: string }) => {
     const res = await apiClient.get<Anomaly[]>('/api/anomalies', { params });
     return res.data;
   },
 
-  getActiveAnomalies: async () => {
-    const res = await apiClient.get<Anomaly[]>('/api/anomalies/active');
+  getActiveAnomalies: async (facility_id?: number | string) => {
+    const res = await apiClient.get<Anomaly[]>('/api/anomalies/active', { params: { facility_id } });
     return res.data;
   },
 
-  getAnomalyById: async (id: number) => {
+  getAnomalyById: async (id: number | string) => {
     const res = await apiClient.get<Anomaly>(`/api/anomalies/${id}`);
     return res.data;
   },
@@ -140,37 +149,38 @@ export const anomalyApi = {
     return res.data;
   },
 
-  checkDuplicates: async (title: string, timeWindowHours: number = 24) => {
+  checkDuplicates: async (title: string, timeWindowHours: number = 24, facility_id?: number | string) => {
     const res = await apiClient.post<DuplicateCheckResponse>('/api/anomalies/check-duplicates', {
       title,
       time_window_hours: timeWindowHours,
+      facility_id,
     });
     return res.data;
   },
 
-  updateAnomalyStatus: async (id: number, status: string) => {
+  updateAnomalyStatus: async (id: number | string, status: string) => {
     const res = await apiClient.patch<Anomaly>(`/api/anomalies/${id}/status`, { status });
     return res.data;
   },
 
-  deleteAnomaly: async (id: number) => {
+  deleteAnomaly: async (id: number | string) => {
     const res = await apiClient.delete(`/api/anomalies/${id}`);
     return res.data;
   },
 
   // Dashboard & Analytics
-  getDashboardMetrics: async () => {
-    const res = await apiClient.get<DashboardMetrics>('/api/analytics/dashboard');
+  getDashboardMetrics: async (facility_id?: number | string) => {
+    const res = await apiClient.get<DashboardMetrics>('/api/analytics/dashboard', { params: { facility_id } });
     return res.data;
   },
 
-  getAnalyticsTrends: async () => {
-    const res = await apiClient.get('/api/analytics/trends');
+  getAnalyticsTrends: async (facility_id?: number | string) => {
+    const res = await apiClient.get('/api/analytics/trends', { params: { facility_id } });
     return res.data;
   },
 
   // AI & CAPA
-  generateCapa: async (anomalyId: number) => {
+  generateCapa: async (anomalyId: number | string) => {
     const res = await apiClient.post<CapaAction>(`/api/ai/capa/generate/${anomalyId}`);
     return res.data;
   },
@@ -180,7 +190,7 @@ export const anomalyApi = {
     return res.data;
   },
 
-  updateCapaStatus: async (capaId: number, review_status: string, reviewer_notes?: string) => {
+  updateCapaStatus: async (capaId: number | string, review_status: string, reviewer_notes?: string) => {
     const res = await apiClient.patch<CapaAction>(`/api/ai/capa/${capaId}/review`, {
       review_status,
       reviewer_notes,
@@ -201,7 +211,7 @@ export const anomalyApi = {
   },
 
   apply5Whys: async (payload: {
-    anomaly_id: number;
+    anomaly_id: number | string;
     root_cause: string;
     corrective_action: string;
     preventive_action: string;
@@ -212,17 +222,24 @@ export const anomalyApi = {
   },
 
   updateCapaFull: async (
-    capaId: number,
+    capaId: number | string,
     payload: {
       root_cause?: string;
       containment_action?: string;
       corrective_action?: string;
       preventive_action?: string;
-      review_status?: string;
       reviewer_notes?: string;
     }
   ) => {
     const res = await apiClient.put<CapaAction>(`/api/ai/capa/${capaId}`, payload);
+    return res.data;
+  },
+
+  signOffCapa: async (capaId: number | string, reviewer_notes?: string) => {
+    const res = await apiClient.post<CapaAction>(`/api/ai/capa/${capaId}/sign-off`, {
+      review_status: 'IMPLEMENTED',
+      reviewer_notes,
+    });
     return res.data;
   },
 };
