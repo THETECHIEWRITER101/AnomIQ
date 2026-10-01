@@ -1,5 +1,5 @@
 import datetime
-from typing import List
+from typing import List, Any, Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -11,8 +11,11 @@ from services.ai_service import ai_engine
 
 router = APIRouter(prefix="/api/ai", tags=["AI Engine"])
 
-def run_capa_generation(anomaly_id: int, db: Session):
-    anomaly = db.query(models.Anomaly).filter(models.Anomaly.id == anomaly_id).first()
+def run_capa_generation(anomaly_id: Any, db: Session):
+    anomaly = db.query(models.Anomaly).filter(models.Anomaly.id == str(anomaly_id)).first()
+    if not anomaly:
+        # Fallback query for integer or direct ID match
+        anomaly = db.query(models.Anomaly).filter(models.Anomaly.id == anomaly_id).first()
     if not anomaly:
         raise HTTPException(status_code=404, detail="Anomaly record not found")
 
@@ -25,7 +28,9 @@ def run_capa_generation(anomaly_id: int, db: Session):
     )
 
     # Check if a CAPA record already exists for this anomaly
-    existing_capa = db.query(models.CapaAction).filter(models.CapaAction.anomaly_id == anomaly_id).first()
+    existing_capa = db.query(models.CapaAction).filter(
+        (models.CapaAction.anomaly_id == str(anomaly_id)) | (models.CapaAction.anomaly_id == anomaly_id)
+    ).first()
     if existing_capa:
         existing_capa.root_cause = capa_data.get("root_cause", "")
         existing_capa.containment_action = capa_data.get("containment_action", "")
@@ -55,7 +60,7 @@ def run_capa_generation(anomaly_id: int, db: Session):
     return new_capa
 
 @router.post("/capa/generate/{anomaly_id}", response_model=schemas.CapaResponse, status_code=status.HTTP_201_CREATED)
-def generate_capa_for_anomaly(anomaly_id: int, db: Session = Depends(get_db)):
+def generate_capa_for_anomaly(anomaly_id: Any, db: Session = Depends(get_db)):
     """
     Expose CAPA Generation REST Endpoint.
     Passes sanitized defect details to Gemini 3.8 Flash, persists structured CAPA, and advances status to CAPA_PENDING.
@@ -63,7 +68,7 @@ def generate_capa_for_anomaly(anomaly_id: int, db: Session = Depends(get_db)):
     return run_capa_generation(anomaly_id, db)
 
 @router.post("/generate-capa/{anomaly_id}", response_model=schemas.CapaResponse)
-def generate_capa_legacy(anomaly_id: int, db: Session = Depends(get_db)):
+def generate_capa_legacy(anomaly_id: Any, db: Session = Depends(get_db)):
     return run_capa_generation(anomaly_id, db)
 
 @router.get("/capa-reviews", response_model=List[schemas.CapaResponse])
@@ -71,8 +76,10 @@ def get_capa_reviews(db: Session = Depends(get_db)):
     return db.query(models.CapaAction).order_by(desc(models.CapaAction.generated_at)).all()
 
 @router.patch("/capa/{capa_id}/review", response_model=schemas.CapaResponse)
-def update_capa_review(capa_id: int, payload: schemas.CapaReviewUpdate, db: Session = Depends(get_db)):
-    capa = db.query(models.CapaAction).filter(models.CapaAction.id == capa_id).first()
+def update_capa_review(capa_id: Any, payload: schemas.CapaReviewUpdate, db: Session = Depends(get_db)):
+    capa = db.query(models.CapaAction).filter(
+        (models.CapaAction.id == str(capa_id)) | (models.CapaAction.id == capa_id)
+    ).first()
     if not capa:
         raise HTTPException(status_code=404, detail="CAPA protocol not found")
 
@@ -89,14 +96,31 @@ def update_capa_review(capa_id: int, payload: schemas.CapaReviewUpdate, db: Sess
             if payload.review_status == "IMPLEMENTED":
                 anomaly.resolved_at = datetime.datetime.utcnow()
 
+                # Dispatch Notification to Facility Head / Plant Manager
+                try:
+                    notification = models.Notification(
+                        facility_id=anomaly.facility_id,
+                        target_role="Facility Head / Operations Manager",
+                        title=f"CAPA Process Complete: Anomaly #{anomaly.id} Resolved",
+                        message=f"CAPA protocol for defect '{anomaly.title}' on {anomaly.production_line} has been verified & implemented.",
+                        type="CAPA_RESOLVED",
+                        anomaly_id=anomaly.id,
+                        read_status=False
+                    )
+                    db.add(notification)
+                except Exception as e:
+                    print(f"Notification error: {e}")
+
     db.commit()
     db.refresh(capa)
     return capa
 
 @router.put("/capa/{capa_id}", response_model=schemas.CapaResponse)
-def update_capa_full(capa_id: int, payload: schemas.CapaUpdateRequest, db: Session = Depends(get_db)):
+def update_capa_full(capa_id: Any, payload: schemas.CapaUpdateRequest, db: Session = Depends(get_db)):
     """Allow full inline editing of CAPA actions prior to or during engineering review."""
-    capa = db.query(models.CapaAction).filter(models.CapaAction.id == capa_id).first()
+    capa = db.query(models.CapaAction).filter(
+        (models.CapaAction.id == str(capa_id)) | (models.CapaAction.id == capa_id)
+    ).first()
     if not capa:
         raise HTTPException(status_code=404, detail="CAPA protocol not found")
 
@@ -120,13 +144,28 @@ def update_capa_full(capa_id: int, payload: schemas.CapaUpdateRequest, db: Sessi
             anomaly.status = "RESOLVED"
             anomaly.resolved_at = datetime.datetime.utcnow()
 
+            # Dispatch Notification to Facility Head / Plant Manager
+            try:
+                notification = models.Notification(
+                    facility_id=anomaly.facility_id,
+                    target_role="Facility Head / Operations Manager",
+                    title=f"CAPA Process Complete: Anomaly #{anomaly.id} Resolved",
+                    message=f"CAPA protocol for defect '{anomaly.title}' on {anomaly.production_line} has been verified & implemented.",
+                    type="CAPA_RESOLVED",
+                    anomaly_id=anomaly.id,
+                    read_status=False
+                )
+                db.add(notification)
+            except Exception as e:
+                print(f"Notification error: {e}")
+
     db.commit()
     db.refresh(capa)
     return capa
 
 @router.post("/5-whys/apply", response_model=schemas.CapaResponse, status_code=status.HTTP_201_CREATED)
 def apply_5_whys_to_capa(payload: schemas.CapaApplyFiveWhysRequest, db: Session = Depends(get_db)):
-    """Directly converts completed 5-Whys diagnostic output into an actionable CAPA record."""
+    """Directly converts completed 5-Whys diagnostic output into an actionable CAPA record and dispatches notification to Quality Sign-off."""
     anomaly = db.query(models.Anomaly).filter(models.Anomaly.id == payload.anomaly_id).first()
     if not anomaly:
         raise HTTPException(status_code=404, detail="Anomaly record not found")
@@ -140,7 +179,24 @@ def apply_5_whys_to_capa(payload: schemas.CapaApplyFiveWhysRequest, db: Session 
         existing_capa.preventive_action = payload.preventive_action
         existing_capa.ai_confidence = payload.ai_confidence or 95.0
         existing_capa.generated_at = datetime.datetime.utcnow()
+        existing_capa.review_status = "PENDING_REVIEW"
         anomaly.status = "CAPA_PENDING"
+
+        # Dispatch notification to Quality Manager / Sign-off Authority
+        try:
+            notif = models.Notification(
+                facility_id=anomaly.facility_id,
+                target_role="Quality Manager / Sign-off Authority",
+                title=f"5-Whys CAPA Ready for Sign-Off: Anomaly #{anomaly.id}",
+                message=f"QA Engineer completed 5-Whys investigation for '{anomaly.title}' on {anomaly.production_line}. Dual logs are ready for Quality sign-off and closure.",
+                type="CAPA_SUBMITTED_FOR_REVIEW",
+                anomaly_id=anomaly.id,
+                read_status=False
+            )
+            db.add(notif)
+        except Exception as e:
+            print(f"Notification error: {e}")
+
         db.commit()
         db.refresh(existing_capa)
         return existing_capa
@@ -156,9 +212,65 @@ def apply_5_whys_to_capa(payload: schemas.CapaApplyFiveWhysRequest, db: Session 
     )
     anomaly.status = "CAPA_PENDING"
     db.add(new_capa)
+
+    # Dispatch notification to Quality Manager / Sign-off Authority
+    try:
+        notif = models.Notification(
+            facility_id=anomaly.facility_id,
+            target_role="Quality Manager / Sign-off Authority",
+            title=f"5-Whys CAPA Ready for Sign-Off: Anomaly #{anomaly.id}",
+            message=f"QA Engineer completed 5-Whys investigation for '{anomaly.title}' on {anomaly.production_line}. Dual logs are ready for Quality sign-off and closure.",
+            type="CAPA_SUBMITTED_FOR_REVIEW",
+            anomaly_id=anomaly.id,
+            read_status=False
+        )
+        db.add(notif)
+    except Exception as e:
+        print(f"Notification error: {e}")
+
     db.commit()
     db.refresh(new_capa)
     return new_capa
+
+
+@router.post("/capa/{capa_id}/sign-off", response_model=schemas.CapaResponse)
+def sign_off_capa_report(capa_id: Any, payload: schemas.CapaReviewUpdate, db: Session = Depends(get_db)):
+    """
+    Dedicated endpoint for Quality Manager / Sign-off Authority.
+    Reviews dual logs (operator log + 5-whys CAPA report), signs off, and closes the incident.
+    """
+    capa = db.query(models.CapaAction).filter(models.CapaAction.id == capa_id).first()
+    if not capa:
+        raise HTTPException(status_code=404, detail="CAPA protocol not found")
+
+    capa.review_status = "IMPLEMENTED"
+    if payload.reviewer_notes:
+        capa.reviewer_notes = payload.reviewer_notes
+    capa.reviewed_at = datetime.datetime.utcnow()
+
+    anomaly = db.query(models.Anomaly).filter(models.Anomaly.id == capa.anomaly_id).first()
+    if anomaly:
+        anomaly.status = "RESOLVED"
+        anomaly.resolved_at = datetime.datetime.utcnow()
+
+        # Resolution notification to Plant operations & Facility Head
+        try:
+            notif = models.Notification(
+                facility_id=anomaly.facility_id,
+                target_role="ALL",
+                title=f"Incident Closed: Anomaly #{anomaly.id} Signed-Off",
+                message=f"Quality Sign-off complete for '{anomaly.title}'. 5-Whys root cause and CAPA successfully verified & closed.",
+                type="CAPA_RESOLVED",
+                anomaly_id=anomaly.id,
+                read_status=False
+            )
+            db.add(notif)
+        except Exception as e:
+            print(f"Notification error: {e}")
+
+    db.commit()
+    db.refresh(capa)
+    return capa
 
 
 @router.post("/voice-intake", response_model=schemas.VoiceIntakeResponse)
