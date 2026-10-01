@@ -1,51 +1,44 @@
-import { mergeProps } from "@base-ui/react/merge-props"
-import { useRender } from "@base-ui/react/use-render"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import React from 'react';
 
-const badgeVariants = cva(
-  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-4xl border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
-        secondary:
-          "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
-        destructive:
-          "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a]:hover:bg-destructive/20",
-        outline:
-          "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
-        ghost:
-          "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-)
-
-function Badge({
-  className,
-  variant = "default",
-  render,
-  ...props
-}: useRender.ComponentProps<"span"> & VariantProps<typeof badgeVariants>) {
-  return useRender({
-    defaultTagName: "span",
-    props: mergeProps<"span">(
-      {
-        className: cn(badgeVariants({ variant }), className),
-      },
-      props
-    ),
-    render,
-    state: {
-      slot: "badge",
-      variant,
-    },
-  })
+export function cn(...inputs: any[]) {
+  return inputs.filter(Boolean).join(' ');
 }
 
-export { Badge, badgeVariants }
+export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
+  children: React.ReactNode;
+  variant?: 'blue' | 'red' | 'yellow' | 'emerald' | 'purple' | 'slate' | 'machine' | 'default' | 'secondary' | 'outline' | 'destructive';
+  className?: string;
+}
+
+export function Badge({ children, variant = 'slate', className, ...props }: BadgeProps) {
+  const variants: Record<string, string> = {
+    blue: 'bg-blue-50 text-blue-700 border-blue-200',
+    red: 'bg-red-50 text-red-700 border-red-200 font-semibold',
+    yellow: 'bg-amber-50 text-amber-700 border-amber-200 font-semibold',
+    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold',
+    purple: 'bg-purple-50 text-purple-700 border-purple-200',
+    slate: 'bg-slate-100 text-slate-700 border-slate-200',
+    machine: 'bg-slate-100 text-slate-700 border-slate-200 font-mono font-medium',
+    default: 'bg-slate-900 text-white border-slate-800',
+    secondary: 'bg-slate-100 text-slate-800 border-slate-200',
+    outline: 'border-slate-200 text-slate-700 bg-white',
+    destructive: 'bg-red-50 text-red-700 border-red-200',
+  };
+
+  const variantClass = variants[variant] || variants.slate;
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-medium border tracking-wide select-none',
+        variantClass,
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </span>
+  );
+}
+
+export default Badge;
