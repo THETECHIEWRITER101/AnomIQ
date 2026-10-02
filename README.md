@@ -270,21 +270,132 @@ A centralized plant alert center (`/app/alerts`) coordinates cross-functional co
 
 ---
 
-## 📡 API Reference
+---
 
-| Method | Endpoint | Description | Free-Tier Optimization |
+## 🗄️ Database Architecture & Entity-Relationship Diagram (ERD)
+
+The database models are designed with **strict multi-tenant isolation, cascade referential integrity, and UUID primary keys** (`String(36)`) compatible with both Supabase PostgreSQL and local SQLite:
+
+```mermaid
+erDiagram
+    FACILITIES ||--o{ USERS : "employs"
+    FACILITIES ||--o{ ANOMALIES : "monitors"
+    FACILITIES ||--o{ NOTIFICATIONS : "broadcasts"
+    ANOMALIES ||--o{ CAPA_ACTIONS : "resolves_via"
+    ANOMALIES ||--o{ NOTIFICATIONS : "triggers"
+
+    FACILITIES {
+        string id PK "UUID String(36)"
+        string name "Facility Name (e.g. Apex Electronics Plant)"
+        string code UK "Facility Code (e.g. FAC-APEX-01)"
+        string industry "AUTOMOTIVE | ELECTRONICS | AEROSPACE"
+        datetime created_at
+    }
+
+    USERS {
+        string id PK "UUID String(36)"
+        string facility_id FK "References facilities.id (CASCADE)"
+        string full_name "User Full Name"
+        string email UK "Work Email"
+        string role "Operator | QA Engineer | Quality Manager"
+        datetime created_at
+    }
+
+    ANOMALIES {
+        string id PK "UUID String(36)"
+        string facility_id FK "References facilities.id (CASCADE)"
+        string title "Defect Summary Title"
+        string machine_id "Equipment Identifier (e.g. CNC-MILL-01)"
+        string production_line "Line Name"
+        string severity "CRITICAL | HIGH | MEDIUM | LOW"
+        string status "OPEN | INVESTIGATING | CAPA_PENDING | RESOLVED | CLOSED"
+        text description "Detailed Floor Observations"
+        string metric_name "Sensor Name (e.g. Vibration, Pressure)"
+        float metric_value "Observed Physical Value"
+        float threshold_value "Upper Critical Tolerance Limit"
+        string operator_name "Logging Operator"
+        string image_url "Compressed WebP Asset URL"
+        datetime detected_at "Index on detected_at DESC"
+        datetime resolved_at
+    }
+
+    CAPA_ACTIONS {
+        string id PK "UUID String(36)"
+        string anomaly_id FK "References anomalies.id (CASCADE)"
+        text root_cause "Conclusive Physical/Mechanical Cause"
+        text containment_action "Immediate Quarantine Action"
+        text corrective_action "Root Cause Elimination"
+        text preventive_action "Systemic Redesign / Poka-Yoke"
+        float ai_confidence "Confidence Rating (e.g. 95.0%)"
+        string review_status "PENDING_REVIEW | APPROVED | REJECTED | IMPLEMENTED"
+        text reviewer_notes "ISO / IATF Sign-Off Audit Statement"
+        datetime generated_at
+        datetime reviewed_at
+    }
+
+    NOTIFICATIONS {
+        string id PK "UUID String(36)"
+        string facility_id FK "References facilities.id (CASCADE)"
+        string target_role "Quality Assurance Engineer | Quality Manager | ALL"
+        string title "Alert Title"
+        text message "Detailed Incident Context"
+        string type "NEW_ANOMALY | CAPA_SUBMITTED_FOR_REVIEW | CAPA_RESOLVED"
+        string anomaly_id FK "References anomalies.id (SET NULL)"
+        boolean read_status "Unread / Read Flag"
+        datetime created_at "Index on created_at DESC"
+    }
+```
+
+---
+
+## 📡 Comprehensive REST API Reference
+
+All routes are fully documented via OpenAPI/Swagger at `/docs`:
+
+### 1. Facility & Onboarding Management
+| Method | Endpoint | Description | Role / Scope |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Server uptime & keepalive check | Ping every 10 min to prevent Render cold wakeups |
-| `GET` | `/api/anomalies` | Query anomalies (filterable by severity, line, status) | Pruned index on `detected_at DESC` |
-| `GET` | `/api/anomalies/active` | Fetch active defects (`status != RESOLVED`) | Single fast index query for client-side aggregation |
-| `POST` | `/api/anomalies` | Log new anomaly ticket | Accepts compressed WebP `image_url` string only |
-| `POST` | `/api/anomalies/check-duplicates` | Shift duplicate search within 24h window | Hardware-accelerated `pg_trgm` GIN similarity search |
-| `PATCH`| `/api/anomalies/{id}/status` | Update anomaly lifecycle status | Background optimistic sync |
-| `POST` | `/api/ai/capa/generate/{id}` | Synthesize AI Root Cause & CAPA | Truncated input, `max_output_tokens=500`, 1h prompt cache |
-| `POST` | `/api/ai/5-whys/step` | Sequential 5-Whys diagnostic step | Telemetry-aware question + 3 quick-response chips |
-| `POST` | `/api/ai/voice-intake` | Parse Web Speech transcript to defect JSON | Strict JSON schema extraction with rule fallback |
-| `GET` | `/api/ai/capa-reviews` | Fetch CAPA audit queue | Indexed by `generated_at DESC` |
-| `PATCH`| `/api/ai/capa/{id}/review` | Quality approval / rejection / implementation | Triggers parent anomaly status progression |
+| `GET` | `/api/facilities` | Retrieve all registered industrial organizations | Public / Onboarding |
+| `POST` | `/api/facilities` | Register a new manufacturing facility | Plant Admin |
+| `POST` | `/api/users/signup` | Onboard user; first facility user becomes Admin | Multi-Role |
+| `POST` | `/api/users/login` | Authenticate using Work Email + Facility ID code | Multi-Role |
+
+### 2. Multi-Tenant Anomaly Register
+| Method | Endpoint | Description | Free-Tier Strategy |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/anomalies` | Query facility anomalies (filterable by severity, line, status) | Facility isolated, indexed query |
+| `GET` | `/api/anomalies/active` | Fetch active unresolved incidents | Single fast indexed query |
+| `GET` | `/api/anomalies/{id}` | Retrieve incident details with attached CAPAs | Cached relation join |
+| `POST` | `/api/anomalies` | Log incident ticket & dispatch `NEW_ANOMALY` alert | Operator role, WebP image URL only |
+| `POST` | `/api/anomalies/check-duplicates` | Shift duplicate search within 24h window | `pg_trgm` GIN similarity search |
+| `PATCH`| `/api/anomalies/{id}/status` | Update lifecycle state (OPEN → RESOLVED) | Optimistic client-side sync |
+| `DELETE`| `/api/anomalies/{id}` | Remove ticket and cascading records | Admin only, `ON DELETE CASCADE` |
+
+### 3. AI Engine, 5-Whys Diagnostic & CAPA Lifecycle
+| Method | Endpoint | Description | AI / Optimization |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/ai/5-whys/step` | Sequential 5-Whys diagnostic step with telemetry | Gemini 3.8 Flash, glove chips schema |
+| `POST` | `/api/ai/5-whys/apply` | Persist completed 5-Whys to CAPA & alert Quality | Status: `CAPA_PENDING`, triggers alert |
+| `POST` | `/api/ai/capa/{id}/sign-off` | Quality Manager dual-logs verification & formal closure | Status: `RESOLVED`, stamps `resolved_at` |
+| `POST` | `/api/ai/capa/generate/{id}` | Autonomous 3-pillar ISO CAPA synthesis | Input truncated to :500, 1h cache |
+| `GET` | `/api/ai/capa-reviews` | Fetch facility CAPA review queue | Indexed by `generated_at DESC` |
+| `PATCH`| `/api/ai/capa/{id}/review` | Update review status (APPROVED, IMPLEMENTED) | Updates parent anomaly status |
+| `PUT` | `/api/ai/capa/{id}` | Full inline editing of CAPA actions | Pre-signoff modification |
+| `POST` | `/api/ai/voice-intake` | Parse Web Speech transcript to structured defect JSON | Zero-cost local browser audio |
+
+### 4. Alert & Notification Dashboard
+| Method | Endpoint | Description | Performance Note |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/notifications` | Fetch real-time alerts by facility & role | Role-filtered, index on `created_at` |
+| `PATCH`| `/api/notifications/{id}/read` | Mark individual notification as read | Single record write |
+| `POST` | `/api/notifications/clear-all` | Mark all facility notifications as read | Bulk update transaction |
+
+### 5. Diagnostics & Analytics
+| Method | Endpoint | Description | Architecture Strategy |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/health` | Server uptime & keepalive check | Keeps free Render container awake |
+| `GET` | `/api/analytics/dashboard` | Aggregated facility operational KPIs | Client-side aggregation capable |
+| `GET` | `/api/analytics/trends` | 7-day failure velocity and line distributions | In-memory computed |
 
 ---
 
