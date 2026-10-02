@@ -399,6 +399,84 @@ All routes are fully documented via OpenAPI/Swagger at `/docs`:
 
 ---
 
+## 🎬 5-Minute Live Judge Demo Playbook
+
+For hackathons, evaluations, and executive reviews, follow this step-by-step 5-minute demonstration script illustrating the end-to-end multi-tenant lifecycle from shop-floor fault to QA root-cause analysis and digital sign-off:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│                              5-MINUTE JUDGE DEMO FLOW                                         │
+├─────────────────────┬──────────────────────┬──────────────────────┬──────────────────────────┤
+│  Act 1 (0:00-1:00)  │  Act 2 (1:00-2:45)   │  Act 3 (2:45-4:00)   │    Act 4 (4:00-5:00)     │
+│   Operator Logs     │  Engineer 5-Whys     │  Quality Manager     │     Multi-Tenant         │
+│   Sensor Anomaly    │  Gemini Diagnostic   │  Dual-Logs Sign-off  │     Facility Isolation   │
+└─────────────────────┴──────────────────────┴──────────────────────┴──────────────────────────┘
+```
+
+### Act 1: Shop Floor Operator (0:00 – 1:00)
+1. **Locate Judge Bar**: In the top floating banner, ensure Facility is set to `Apex Electronics Plant` and Role is set to `Operator (Sarah Jenkins)`.
+2. **Log Fault**: Click the vibrant **"Log Anomaly"** button.
+3. **Submit Sensor Anomaly**:
+   - Machine Line: `Surface Mount Line 2 (SMT-02)`
+   - Issue Type: `Thermal Runaway / Overheating`
+   - Severity: `High` or `Critical`
+   - Metric Spike: `Temperature: 88.4°C (Nominal: 45.0°C)`
+4. **Trigger Real-Time Alert**: On submit, notice the instantaneous chime and alert notification dispatched to the facility pipeline. The Operator role cannot access sign-offs or CAPA reports (RBAC enforced).
+
+### Act 2: QA Engineer & 5-Whys Diagnostic Copilot (1:00 – 2:45)
+1. **Switch Role**: On the Judge Bar, click the role pill **"QA Engineer"** (`Marcus Vance`).
+2. **Observe Notification**: The notification bell rings with an unread badge indicating `[CRITICAL] Thermal Runaway on Line SMT-02`.
+3. **Launch 5-Whys Diagnostic**: Click the anomaly row or notification action to launch the **"Interactive 5-Whys Copilot"**.
+4. **Interactive Gemini Reasoning**:
+   - **Why 1**: Copilot analyzes the telemetry and asks why the temperature spiked to 88.4°C.
+   - **Technician Interaction**: Click the quick-response suggestion chip `Coolant pump valve feedback unresponsive`.
+   - **Why 2 - 5**: Copilot drills down progressively into electrical wiring, solenoid corrosion, and maintenance interval omission.
+5. **Generate & Save CAPA**: Click **"Generate & Save CAPA Report"**. The backend persists the structured investigation and advances the anomaly to `In Review`.
+
+### Act 3: Quality Manager Dual-Logs Audit & Digital Sign-off (2:45 – 4:00)
+1. **Switch Role**: On the Judge Bar, click **"Quality Manager"** (`Elena Rostova`).
+2. **Open Dual Logs**: Notice the alert `CAPA Report Submitted for Sign-off`. Click **"Dual Logs Audit"**.
+3. **Compare Verification Records**:
+   - **Left Column (Operator Log)**: Displays initial physical telemetry timestamp, sensor readings, and raw operator description.
+   - **Right Column (Engineer CAPA)**: Displays the completed 5-Whys root-cause tree, preventative actions, and technician notes.
+4. **Digital Sign-off**: Enter manager closing verification notes (e.g., `"Solenoid replaced with IP67 sealed unit. Burn-in cycle passed at 44.2°C"`) and click **"Approve & Execute Sign-off"**.
+5. The anomaly status shifts to `Resolved` with an immutable digital timestamp.
+
+### Act 4: Multi-Tenant Facility Isolation Check (4:00 – 5:00)
+1. **Switch Facility**: In the Judge Bar, change the facility from `Apex Electronics Plant` to `Detroit Assembly Cell 4`.
+2. **Verify Isolation**: Observe that all Apex anomalies, notifications, and analytics metrics disappear instantly. Detroit's independent dashboard renders only its automotive powertrain anomalies.
+3. Switch back to Apex to demonstrate seamless state restoration without full page reloads.
+
+---
+
+## 🧪 Automated Testing & Verification Suite
+
+AnomIQ includes comprehensive backend integration tests and frontend bundling validation to guarantee hackathon reliability:
+
+### 1. Run Backend API Integration Tests
+Run the standalone integration verification suite against the active backend server:
+```bash
+# Ensure backend is running (or test against local SQLite)
+python backend/test_api_integration.py
+```
+The test suite validates:
+- [x] `GET /health` keeps alive and database ping
+- [x] Multi-tenant facility filtering (`/api/facilities`, `/api/anomalies?facility_id=...`)
+- [x] Anomaly creation with dynamic severity and telemetry
+- [x] Gemini 3.8 Flash 5-Whys step progression & fallback response generation
+- [x] Notification broadcast and multi-role recipient inbox isolation
+- [x] Dual-logs audit retrieval and manager sign-off state transition
+
+### 2. Frontend Production Bundling & Linting
+Validate TypeScript types and zero build regressions:
+```bash
+cd frontend
+npm run build
+```
+Build output produces optimized vendor split chunks (`vendor-react`, `vendor-charts`, `vendor-icons`, `vendor-motion`) ensuring lightning-fast load times even under shop-floor edge network conditions.
+
+---
+
 ## 🚀 Setup & Local Development
 
 ### Prerequisites
