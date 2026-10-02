@@ -1,23 +1,77 @@
 # AnomIQ — Intelligent Manufacturing Anomaly & CAPA Platform
 
-> **Full-Stack Industrial Intelligence Platform** engineered for shopfloor defect intake, interactive 5-Whys root-cause troubleshooting, duplicate recurrence clustering, and automated ISO 9001 / OSHA audit-ready CAPA generation — designed strictly within the **free tiers** of Google Gemini, Supabase, Render, and Vercel.
+<div align="center">
+
+![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
+![React 19](https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Google Gemini 3.8 Flash](https://img.shields.io/badge/Google_Gemini_3.8_Flash-8E75B2?style=for-the-badge&logo=google&logoColor=white)
+![Supabase PostgreSQL](https://img.shields.io/badge/Supabase_PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![License MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)
+
+**Next-Generation Industrial Intelligence Platform for Shopfloor Defect Intake, Interactive 5-Whys Troubleshooting, Multi-Tenant Plant Isolation, and ISO 9001 / IATF 16949 Audit-Ready CAPA Lifecycle Management.**
+
+*Built strictly within the zero-cost free tiers of Google Gemini Flash, Supabase, Render, and Vercel.*
+
+</div>
 
 ---
 
-## 📌 Executive Summary (For Non-Tech Stakeholders & Plant Managers)
+## 📌 Executive Summary & Problem Statement
 
-### 🏭 What is AnomIQ?
-In modern manufacturing plants (automotive, electronics, precision machining, and stamping), machine downtime costs thousands of dollars per minute. When equipment breaks or sensors trigger alarms, shop floor teams face three bottlenecks:
-1. **Complicated Reporting**: Operators wearing heavy protective gloves struggle to type incident reports on physical keyboards or touchscreens.
-2. **Duplicate Stoppage Tickets**: Multiple operators on the same shift often file repetitive tickets for the same line breakdown, causing confusion and wasted maintenance effort.
-3. **Slow & Disconnected RCA/CAPA**: Root Cause Analysis (RCA) and Corrective and Preventive Actions (CAPA) are often done in spreadsheets days after the incident, failing audits and failing to prevent recurrence.
+### 🏭 The Industrial Bottleneck
+In modern discrete and process manufacturing facilities (automotive stamping, electronics SMT, robotic welding cells, and precision CNC machining), unplanned machine downtime averages **$22,000 per minute**. When physical sensors trip or tooling malfunctions occur, operations break down across four critical friction points:
 
-### 🌟 How This Upgrade Solves It:
-- 🎙️ **Zero-Cost Voice-to-Defect Intake ("Floor Mode")**: Operators tap one button and speak naturally (e.g., *"Stamping Line 2 hydraulic ram has high pressure spike and severe vibration"*). The system uses the browser's native speech recognition and Google Gemini Flash to auto-populate the entire ticket in 5 seconds.
-- 🔍 **Interactive "5-Whys" Diagnostic Copilot**: Instead of generating a generic paragraph, the AI acts as an active industrial troubleshooting partner on the shopfloor. It asks targeted "Why did this happen?" questions and offers 3 touch-friendly chips designed for industrial gloves, guiding the technician to the true root cause.
-- ⚡ **Shift Recurrence & Duplicate Clustering**: Using PostgreSQL trigram similarity search (`pg_trgm`), the system checks in real-time whether a similar defect was already reported within the last 24 hours, alerting the operator immediately.
-- 📄 **Instant Client-Side ISO 9001 / OSHA Audit PDF Export**: With a single click, the browser generates an audit-ready, formal CAPA compliance document complete with document control numbers, 8D analysis, containment steps, and digital signature sign-off lines — without overloading backend servers.
-- 💰 **100% Free-Tier Compliant**: Zero monthly cloud infrastructure costs. The entire platform runs comfortably inside the free tiers of Render, Vercel, Supabase, and Google AI.
+1. **Cumbersome Floor Reporting**: Machine operators wearing heavy Class 2/3 electrical or anti-vibration gloves cannot type lengthy diagnostic descriptions on oily touchscreens or physical keyboards. Critical symptoms get omitted.
+2. **Shift Duplicate Ticket Overload**: When a conveyor or hydraulic press fluctuates across shift changeovers, multiple operators file redundant tickets, causing chaos for maintenance crews and inflating Mean Time to Repair (MTTR).
+3. **Passive, Disconnected Root Cause Analysis (RCA)**: Traditional computerized maintenance management systems (CMMS) generate static paragraphs days after an incident. No step-by-step diagnostic reasoning tree is executed at the machine side.
+4. **Audit Non-Compliance & Inadequate Sign-Off**: ISO 9001:2015 (Clause 10.2) and IATF 16949 require rigorous cross-verification between the initial physical sensor deviation and the completed Corrective and Preventive Action (CAPA). Plants using ad-hoc spreadsheets fail annual compliance audits.
+
+### 🌟 How AnomIQ Solves It:
+- 🎙️ **Zero-Cost Voice-to-Defect Intake ("Floor Mode")**: Operators hold a single button and speak naturally in industrial noise. Browser-native speech recognition paired with Gemini 3.8 Flash extracts structured line, machine ID, symptom, severity, and sensor deviations in **under 500ms**.
+- 🔍 **Interactive 5-Whys Diagnostic Copilot**: AI acts as an active industrial troubleshooting partner, formulating targeted physical inquiries with **glove-friendly quick-response chips** that step sequentially from symptom to systemic failure.
+- 🏢 **Multi-Tenant Facility & Strict Role Routing**: Complete organizational multi-tenancy. Facilities (`Apex Electronics Plant - Line 1` vs. `Detroit Assembly Cell 4`) remain 100% data-isolated with dedicated roles: **Floor Operator**, **QA Engineer**, and **Quality Sign-off Manager**.
+- 📋 **Dual-Logs Verification & Formal Sign-Off**: Quality Managers inspect side-by-side **Log #1 (Operator Physical Telemetry)** against **Log #2 (Engineer 5-Whys CAPA Report)** before stamping formal closure.
+- ⚡ **Real-Time Shift Recurrence Clustering (`pg_trgm`)**: Hardware-accelerated trigram similarity search alerts operators instantly if a similar defect occurred within the past 24 hours.
+- 📄 **1-Click ISO 9001 / IATF 16949 Audit PDF Generation**: Generates official, publication-quality 8D compliance reports with Document Control Numbers directly on the client side without burning backend memory.
+
+---
+
+## 🏢 Multi-Tenant Facility Hierarchy & Role Architecture
+
+AnomIQ is engineered from the ground up as a **multi-tenant, enterprise-grade industrial SaaS**:
+
+```mermaid
+graph TD
+    A["Industrial Enterprise"] --> B["Facility: Apex Electronics Plant (FAC-APEX-01)"]
+    A --> C["Facility: Detroit Assembly Cell 4 (FAC-DET-04)"]
+
+    subgraph Apex ["Apex Electronics Plant - Line 1"]
+        B1["👷 Rajesh Kumar (Floor Operator)"] -->|Logs Incident| B_Anom["Isolated Anomalies & Telemetry"]
+        B2["🛠️ Sarah Jenkins (Lead QA Engineer)"] -->|Executes 5-Whys & Drafts CAPA| B_Capa["5-Whys CAPA Register"]
+        B3["📋 David Ross (Quality Manager)"] -->|Audits Dual Logs & Signs Off| B_Close["Audit Sign-Off & Closure"]
+    end
+
+    subgraph Detroit ["Detroit Assembly Cell 4"]
+        C1["👷 Marcus Vance (Floor Operator)"] -->|Logs Incident| C_Anom["Isolated Anomalies & Telemetry"]
+        C2["🛠️ Elena Rostova (Lead QA Engineer)"] -->|Executes 5-Whys & Drafts CAPA| C_Capa["5-Whys CAPA Register"]
+        C3["📋 Arthur Vance (Quality Manager)"] -->|Audits Dual Logs & Signs Off| C_Close["Audit Sign-Off & Closure"]
+    end
+```
+
+### Role-Based Capability Matrix
+
+| Capability / Action | 👷 Floor Operator / Technician | 🛠️ QA & Reliability Engineer | 📋 Quality Manager / Sign-off Authority |
+| :--- | :---: | :---: | :---: |
+| **Voice-to-Defect Intake (Floor Mode)** | ✅ **Primary Action** | 👁️ View Only | 👁️ View Only |
+| **Manual Incident Ticket Logging** | ✅ **Primary Action** | ❌ Restricted | ❌ Restricted |
+| **Real-Time Severity Alerts Queue** | 👁️ Operator Logged Feed | ✅ **Instant Priority Queue** | 👁️ Audit Queue |
+| **Interactive 5-Whys Diagnostic Copilot** | ❌ Restricted | ✅ **Full Execution** | 👁️ Inspection Only |
+| **AI CAPA Drafting & Registering** | ❌ Restricted | ✅ **Author & Submit** | 👁️ Audit & Review |
+| **Dual Logs Audit (Operator Log vs. 5-Whys CAPA)** | ❌ Restricted | 👁️ Review Draft | ✅ **Exclusive Full Audit** |
+| **Formal ISO / IATF Sign-Off & Incident Closure** | ❌ Restricted | ❌ Restricted | ✅ **Exclusive Authority** |
+| **Client-Side ISO 9001 / OSHA PDF Export** | ❌ Restricted | ✅ View & Export | ✅ **Full Sign-Off Export** |
 
 ---
 
