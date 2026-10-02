@@ -242,6 +242,32 @@ ISO 9001:2015 (Clause 10.2) and IATF 16949 mandate that corrective actions canno
 - **Optimistic State**: When an operator updates ticket status from `OPEN` to `INVESTIGATING` or `RESOLVED`, the UI updates instantly. The API request processes in the background; if network connectivity fails, state rolls back automatically and displays an alert.
 - **Button Debouncing**: The "Generate AI CAPA" button is immediately disabled with a spinner upon first click, preventing double-clicks from exhausting Gemini API quotas.
 
+### 7. Seamless Multi-Tenant Demo Switcher ("Judge Bar")
+Judges and hackathon evaluators have **less than 5 minutes** to evaluate multi-tenancy, cross-facility data isolation, and role permissions. AnomIQ features a sleek, non-intrusive floating dev-bar pinned to the top of the interface:
+
+- **Dropdown 1 (Switch Facility)**:
+  - Toggle between `Apex Electronics Plant - Line 1` (`FAC-APEX-01`) and `Detroit Assembly Cell 4` (`FAC-DET-04`).
+  - Queries instantly isolate telemetry feeds, open tickets, and alerts to that facility.
+- **Dropdown 2 (Switch Persona under that Facility)**:
+  - 👷 **Floor Operator** (`Rajesh Kumar` / `Marcus Vance`): Only role with permissions to **Log Anomaly** and activate floor voice intake.
+  - 🛠️ **Lead QA Engineer** (`Sarah Jenkins` / `Elena Rostova`): Receives real-time alerts with severity indicators, runs the **5-Whys Diagnostic Copilot**, and drafts CAPA reports.
+  - 📋 **Quality Manager / Sign-off Authority** (`David Ross` / `Arthur Vance`): Receives submitted CAPAs, audits **Dual Logs**, and holds the exclusive authority to sign off and close incidents.
+- **Instant Reactive Sync**:
+  - Toggling either dropdown updates `localStorage.setItem('anomiq_user', ...)` and dispatches a window event (`anomiq-user-switched`).
+  - All screens, action buttons, unread counters, and data tables update **reactively without requiring a page reload**.
+
+### 8. Role-Routed Alert & Notification Dashboard
+A centralized plant alert center (`/app/alerts`) coordinates cross-functional communication between operators, engineers, and plant leadership:
+
+- **Automated Event-Driven Dispatch**:
+  - *Step 1*: When an operator logs a ticket, a `NEW_ANOMALY` notification is dispatched targeting `Quality Assurance Engineer` containing equipment ID and severity level.
+  - *Step 2*: When the engineer completes the 5-Whys investigation and saves to CAPA, a `CAPA_SUBMITTED_FOR_REVIEW` notification is dispatched targeting `Quality Manager / Sign-off Authority`.
+  - *Step 3*: When the Quality Manager signs off and closes the report, a `CAPA_RESOLVED` notification is broadcast across operations.
+- **Direct Modal Triggers on Alert Cards**:
+  - Engineers can click **`[🛠️ Run 5-Whys Copilot]`** directly on an incoming anomaly alert to immediately launch the diagnostic modal.
+  - Quality Managers can click **`[📋 Audit Dual Logs & Sign-Off]`** directly on a submitted CAPA alert to open the side-by-side comparison modal.
+- **Queue Tabs**: Instant filtering by `All Facility Alerts`, `Quality Engineer Queue`, `Facility Head / Sign-off Queue`, and `Unread Alerts`.
+
 ---
 
 ## 📡 API Reference
