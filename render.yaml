@@ -9,6 +9,8 @@ services:
     plan: free
     autoDeploy: true
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: PORT
         value: 8000
       - key: DATABASE_URL
@@ -17,3 +19,4 @@ services:
         sync: false
       - key: CORS_ORIGINS
         value: "http://localhost:5173,http://127.0.0.1:5173,https://anomiq.vercel.app"
+
