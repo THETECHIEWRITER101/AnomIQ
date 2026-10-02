@@ -129,13 +129,70 @@ AnomIQ/
 
 ## ⚡ Key Technical Features & Workflows
 
-### 1. Interactive "5-Whys" Diagnostic Copilot
-- **Shopfloor Context**: Rather than generating static paragraphs, maintenance technicians are guided step-by-step through an 8D diagnostic tree.
-- **Workflow**:
-  1. Anomaly opened: AI reads sensor telemetry (e.g., vibration 8.4 mm/s, max limit 4.5 mm/s) and formulates targeted *Why #1*.
-  2. Technician taps one of 3 quick-response chips (optimized for industrial gloves) or enters a brief observation.
-  3. AI steps sequentially through Why #2, #3, #4, and #5.
-  4. Final step: Conclusive root cause, immediate containment action, and long-term preventive action synthesized with 1-click persistence to the database.
+### 1. Interactive "5-Whys" Diagnostic Copilot (Powered by Gemini 3.8 Flash)
+
+Rather than generating a static, passive text paragraph, AnomIQ implements an **active, conversational troubleshooting copilot** for shopfloor technicians:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Tech as 🛠️ Technician (Wearing Gloves)
+    participant Modal as 🖥️ 5-Whys Socratic Modal
+    participant AI as 🧠 Gemini 3.8 Flash Engine
+    participant DB as 🗄️ PostgreSQL Database
+
+    Tech->>Modal: Opens Anomaly (e.g. CNC-MILL-01 Vibration: 8.75 mm/s, Limit: 4.5 mm/s)
+    Modal->>AI: POST /api/ai/5-whys/step (Step 1, Telemetry & Threshold Breach)
+    AI-->>Modal: Why #1: "Why did spindle vibration spike to 8.75 mm/s?" + 3 Glove-Friendly Chips
+    Tech->>Modal: Taps Chip: "Workpiece unbalance or bearing play"
+    Modal->>AI: POST /api/ai/5-whys/step (Step 2, Prior History + Observation)
+    AI-->>Modal: Why #2 + 3 Deeper Mechanical Chips
+    Note over Modal,AI: Sequentially steps through Why #3, #4, and #5
+    Modal->>AI: POST /api/ai/5-whys/step (Step 5 - Final Root Cause Synthesis)
+    AI-->>Modal: Synthesized Root Cause, Containment, Corrective & Preventive Actions
+    Tech->>Modal: Clicks "Save to CAPA Register"
+    Modal->>DB: POST /api/ai/5-whys/apply (Creates CapaAction, Updates Status: CAPA_PENDING)
+    DB-->>Tech: 🔔 Dispatches Notification to Quality Sign-Off Manager
+```
+
+#### Diagnostic Copilot Features:
+- **Telemetry-Aware Inquiries**: Prompts are dynamically contextualized with physical sensor telemetry (`metric_name`, observed `metric_value`, and strict tolerance `threshold_value`).
+- **Glove-Friendly Quick-Response Chips**: Provides exactly 3 touch-friendly chips (< 8 words each) allowing technicians wearing Class 2/3 protective gloves to drill down without typing.
+- **Single-Sentence Floor Observation Input**: Optional input allowing floor operators to type or dictate specific machine symptoms.
+- **Reasoning Trail Chain**: Displays an expanding historical investigation chain showing every step's question and answer.
+- **1-Click CAPA Synchronization**: On completion, saves directly into the official `capa_actions` table, stamps `PENDING_REVIEW`, and sets the anomaly status to `CAPA_PENDING`.
+
+---
+
+### 1.1 Dual-Logs Verification & Formal Sign-Off Workflow
+
+ISO 9001:2015 (Clause 10.2) and IATF 16949 mandate that corrective actions cannot be signed off without cross-verification against the initial physical symptom:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 DUAL LOGS AUDIT & VERIFICATION PANEL                                   │
+├────────────────────────────────────────────────────┬───────────────────────────────────────────────────┤
+│           LOG #1: OPERATOR TELEMETRY LOG           │          LOG #2: 5-WHYS CAPA REPORT               │
+├────────────────────────────────────────────────────┼───────────────────────────────────────────────────┤
+│ • Logged By: Rajesh Kumar (Floor Operator)         │ • Investigated By: Sarah Jenkins (Lead QA Eng)    │
+│ • Production Line: Line A - Precision Machining    │ • Diagnostic Trail: Steps 1 through 5 Verified    │
+│ • Unit: CNC-MILL-01 | Timestamp: 14:20:15          │ • Synthesized Root Cause: Sub-harmonic resonance  │
+│ • Telemetry Breach: Vibration 8.75 (Limit: 4.50)   │ • Immediate Containment: Quarantine batch 402     │
+│ • Observed Symptom: High screeching chatter        │ • Corrective Action: Replace angular contact set  │
+│ • Initial Status: OPEN / DETECTED                  │ • Preventive Action: Continuous telemetry alarm   │
+├────────────────────────────────────────────────────┴───────────────────────────────────────────────────┤
+│ QUALITY SIGN-OFF CONTROLS:                                                                             │
+│ [ Reviewer Notes: "Dual logs inspected. Countermeasures validated on physical machine. Approved." ]   │
+│                                                                                                        │
+│   [ SIGN-OFF & CLOSE INCIDENT ]  ──>  Status: RESOLVED  ──>  Dispatches Resolution Notification      │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Exclusive Role Authority**: Only the **Quality Manager / Sign-off Authority** persona possesses the cryptographic authority to execute formal sign-offs.
+- **Dual Logs Audit Modal**: An interactive comparison interface where the manager reviews both logs side-by-side.
+- **Formal Status Progression**: Clicking **Sign-Off & Close Incident** sets `capa.review_status = "IMPLEMENTED"`, updates `anomaly.status = "RESOLVED"`, stamps `anomaly.resolved_at = NOW()`, and broadcasts a resolution notification to operations.
+
+---
 
 ### 2. Zero-Cost Voice-to-Defect Intake ("Floor Mode")
 - **Mechanism**: Utilizes browser-native `webkitSpeechRecognition` / `SpeechRecognition` directly on the operator's device (no server audio processing or third-party paid transcription APIs).
