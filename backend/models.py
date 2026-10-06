@@ -1,3 +1,16 @@
+"""
+AnomIQ Database Schema Models (SQLAlchemy ORM)
+Complete 8-table multi-tenant industrial schema:
+1. Facilities (Multi-tenant plant isolation)
+2. Users (Role-based access: Operator, QA Engineer, Quality Manager)
+3. Anomalies (Shopfloor defect intake & physical telemetry)
+4. CapaActions (AI-generated ISO 9001 / IATF 16949 5-Whys CAPA actions)
+5. CapaRecords (Audit trail CAPA records)
+6. Notifications (Event-driven role alert routing)
+7. Investigations (Detailed engineering & telemetry investigations)
+8. Approvals (Audit sign-off workflow decisions)
+"""
+
 import uuid
 import datetime
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Boolean

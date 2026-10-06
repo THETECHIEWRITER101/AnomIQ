@@ -1,5 +1,17 @@
 -- ==============================================================================
--- 1. ENABLE UUID EXTENSION
+-- ANOMIQ SUPABASE POSTGRESQL FULL 8-TABLE ERD SCHEMA
+-- 1. facilities       (Multi-tenant organizational plant units)
+-- 2. users            (User profiles & role permissions)
+-- 3. anomalies        (Shopfloor defect logs & physical sensor telemetry)
+-- 4. capa_actions     (AI 5-Whys root cause & ISO 9001/IATF 16949 actions)
+-- 5. capa_records     (CAPA audit record log)
+-- 6. notifications    (Role-based event notifications & alerts)
+-- 7. investigations   (Engineering diagnostic notes & lab telemetry)
+-- 8. approvals        (Quality Manager formal sign-off audit trail)
+-- ==============================================================================
+
+-- ==============================================================================
+-- 1. ENABLE UUID & TRIGRAM EXTENSIONS
 -- ==============================================================================
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
