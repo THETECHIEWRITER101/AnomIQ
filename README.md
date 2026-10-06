@@ -397,6 +397,19 @@ erDiagram
     }
 ```
 
+### 📊 Entity & Relational Architecture Dictionary
+
+| Entity | Primary Key | Key Foreign Keys | Purpose & ISO 9001 / IATF 16949 Audit Scope |
+| :--- | :--- | :--- | :--- |
+| **`FACILITIES`** | `id` (UUID) | None | Top-level multi-tenant organizational container ensuring 100% plant data isolation. |
+| **`USERS`** | `id` (UUID) | `facility_id` → `facilities.id` | User identity & role RBAC (`Operator`, `QA Engineer`, `Quality Manager`). |
+| **`ANOMALIES`** | `id` (UUID) | `facility_id` → `facilities.id`<br>`reported_by` → `users.id` | Shopfloor intake register for machine defects, sensor breaches, and physical observations. |
+| **`CAPA_ACTIONS`** | `id` (UUID) | `anomaly_id` → `anomalies.id` | AI-synthesized 5-Whys root cause, containment, corrective action, & preventive controls. |
+| **`CAPA_RECORDS`** | `id` (UUID) | `anomaly_id` → `anomalies.id` | Audit trail record log for CAPA lifecycle status tracking (`DRAFT`, `IN_PROGRESS`, `COMPLETED`). |
+| **`NOTIFICATIONS`** | `id` (UUID) | `facility_id` → `facilities.id`<br>`user_id` → `users.id`<br>`anomaly_id` → `anomalies.id` | Event-driven cross-functional alerts routing tickets between operators, engineers, & managers. |
+| **`INVESTIGATIONS`**| `id` (UUID) | `anomaly_id` → `anomalies.id`<br>`technician_id` → `users.id` | Deep engineering troubleshooting notes & structured lab telemetry data (`jsonb`). |
+| **`APPROVALS`** | `id` (UUID) | `anomaly_id` → `anomalies.id`<br>`approver_id` → `users.id` | Formal audit sign-off block capturing cryptographic role verification & Quality Manager stamp. |
+
 ---
 
 ## 📡 Comprehensive REST API Reference
