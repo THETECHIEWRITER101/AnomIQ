@@ -281,68 +281,119 @@ erDiagram
     FACILITIES ||--o{ USERS : "employs"
     FACILITIES ||--o{ ANOMALIES : "monitors"
     FACILITIES ||--o{ NOTIFICATIONS : "broadcasts"
+    USERS ||--o{ ANOMALIES : "reports"
+    USERS ||--o{ NOTIFICATIONS : "receives"
+    USERS ||--o{ INVESTIGATIONS : "conducts"
+    USERS ||--o{ APPROVALS : "signs"
     ANOMALIES ||--o{ CAPA_ACTIONS : "resolves_via"
+    ANOMALIES ||--o{ CAPA_RECORDS : "tracks"
     ANOMALIES ||--o{ NOTIFICATIONS : "triggers"
+    ANOMALIES ||--o{ INVESTIGATIONS : "undergoes"
+    ANOMALIES ||--o{ APPROVALS : "requires"
 
     FACILITIES {
-        string id PK "UUID String(36)"
-        string name "Facility Name (e.g. Apex Electronics Plant)"
-        string code UK "Facility Code (e.g. FAC-APEX-01)"
-        string industry "AUTOMOTIVE | ELECTRONICS | AEROSPACE"
-        datetime created_at
+        uuid id PK
+        varchar name "Facility Name"
+        varchar code UK "Facility Code"
+        varchar industry "AUTOMOTIVE or ELECTRONICS or AEROSPACE"
+        timestamptz created_at
     }
 
     USERS {
-        string id PK "UUID String(36)"
-        string facility_id FK "References facilities.id (CASCADE)"
-        string full_name "User Full Name"
-        string email UK "Work Email"
-        string role "Operator | QA Engineer | Quality Manager"
-        datetime created_at
+        uuid id PK
+        uuid facility_id FK "References facilities.id"
+        varchar full_name "User Full Name"
+        varchar email UK "Work Email"
+        varchar role "Operator or QA Engineer or Quality Manager"
+        varchar active_industry "Selected Industry Profile"
+        timestamptz last_login_at
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     ANOMALIES {
-        string id PK "UUID String(36)"
-        string facility_id FK "References facilities.id (CASCADE)"
-        string title "Defect Summary Title"
-        string machine_id "Equipment Identifier (e.g. CNC-MILL-01)"
-        string production_line "Line Name"
-        string severity "CRITICAL | HIGH | MEDIUM | LOW"
-        string status "OPEN | INVESTIGATING | CAPA_PENDING | RESOLVED | CLOSED"
+        uuid id PK
+        uuid facility_id FK "References facilities.id"
+        varchar title "Defect Summary Title"
+        varchar machine_id "Equipment Identifier"
+        varchar machine_line "Machine Line Identifier"
+        varchar production_line "Production Line Name"
+        varchar severity "CRITICAL or HIGH or MEDIUM or LOW"
+        varchar status "OPEN or INVESTIGATING or CAPA_PENDING or RESOLVED or CLOSED"
         text description "Detailed Floor Observations"
-        string metric_name "Sensor Name (e.g. Vibration, Pressure)"
-        float metric_value "Observed Physical Value"
-        float threshold_value "Upper Critical Tolerance Limit"
-        string operator_name "Logging Operator"
-        string image_url "Compressed WebP Asset URL"
-        datetime detected_at "Index on detected_at DESC"
-        datetime resolved_at
-    }
-
-    CAPA_ACTIONS {
-        string id PK "UUID String(36)"
-        string anomaly_id FK "References anomalies.id (CASCADE)"
-        text root_cause "Conclusive Physical/Mechanical Cause"
-        text containment_action "Immediate Quarantine Action"
-        text corrective_action "Root Cause Elimination"
-        text preventive_action "Systemic Redesign / Poka-Yoke"
-        float ai_confidence "Confidence Rating (e.g. 95.0%)"
-        string review_status "PENDING_REVIEW | APPROVED | REJECTED | IMPLEMENTED"
-        text reviewer_notes "ISO / IATF Sign-Off Audit Statement"
-        datetime generated_at
-        datetime reviewed_at
+        varchar metric_name "Sensor Metric Name"
+        float8 metric_value "Observed Physical Value"
+        float8 threshold_value "Upper Critical Tolerance Limit"
+        varchar operator_name "Logging Operator Name"
+        varchar image_url "Compressed WebP Asset URL"
+        varchar industry "Industry Domain"
+        varchar lot_or_batch_number "Batch or Lot Identifier"
+        varchar compliance_standard "Compliance Standard ISO 9001 or IATF 16949"
+        jsonb industry_data "Domain Specific JSON Data"
+        uuid reported_by FK "References users.id"
+        timestamptz detected_at
+        timestamptz resolved_at
     }
 
     NOTIFICATIONS {
-        string id PK "UUID String(36)"
-        string facility_id FK "References facilities.id (CASCADE)"
-        string target_role "Quality Assurance Engineer | Quality Manager | ALL"
-        string title "Alert Title"
+        uuid id PK
+        uuid facility_id FK "References facilities.id"
+        uuid user_id FK "References users.id"
+        varchar target_role "Target Persona or Role"
+        varchar title "Alert Title"
         text message "Detailed Incident Context"
-        string type "NEW_ANOMALY | CAPA_SUBMITTED_FOR_REVIEW | CAPA_RESOLVED"
-        string anomaly_id FK "References anomalies.id (SET NULL)"
-        boolean read_status "Unread / Read Flag"
-        datetime created_at "Index on created_at DESC"
+        varchar type "NEW_ANOMALY or CAPA_SUBMITTED_FOR_REVIEW or CAPA_RESOLVED"
+        uuid anomaly_id FK "References anomalies.id"
+        bool read_status "Unread or Read Flag"
+        timestamptz created_at
+    }
+
+    CAPA_ACTIONS {
+        uuid id PK
+        uuid anomaly_id FK "References anomalies.id"
+        text root_cause "Conclusive Physical Cause"
+        text containment_action "Immediate Quarantine Action"
+        text corrective_action "Root Cause Elimination"
+        text preventive_action "Systemic Redesign or Poka-Yoke"
+        text regulatory_impact "Compliance and Regulatory Statement"
+        float8 ai_confidence "AI Model Confidence Rating"
+        varchar review_status "PENDING_REVIEW or APPROVED or REJECTED or IMPLEMENTED"
+        text reviewer_notes "ISO or IATF Sign-Off Audit Statement"
+        timestamptz generated_at
+        timestamptz reviewed_at
+    }
+
+    CAPA_RECORDS {
+        uuid id PK
+        uuid anomaly_id FK "References anomalies.id"
+        text containment_action "Immediate Containment Action"
+        text corrective_action "Corrective Action Plan"
+        text preventive_action "Preventive Controls"
+        text regulatory_impact "Regulatory and Compliance Impact"
+        varchar status "DRAFT or IN_PROGRESS or COMPLETED"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    INVESTIGATIONS {
+        uuid id PK
+        uuid anomaly_id FK "References anomalies.id"
+        uuid technician_id FK "References users.id"
+        text root_cause_notes "Detailed Engineering Investigation Notes"
+        jsonb lab_telemetry "Experimental or Sensor Telemetry Data"
+        timestamptz created_at
+    }
+
+    APPROVALS {
+        uuid id PK
+        uuid anomaly_id FK "References anomalies.id"
+        uuid approver_id FK "References users.id"
+        varchar role_at_signing "Approver Sign-off Role"
+        varchar industry "Industry Domain"
+        varchar workflow_stage "Workflow Stage"
+        varchar decision "APPROVED or REJECTED"
+        text comments "Audit Sign-off Comments"
+        timestamptz signed_at
     }
 ```
 
